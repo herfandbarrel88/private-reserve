@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<title>The Private Reserve</title>
+<meta name="description" content="Members-only cigars, spirits & accessories" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Private Reserve" />
+<meta name="theme-color" content="#1C1410" />
+<style>
+  :root{
+    --bg:#1C1410; --surface:#221A13; --surface2:#17110C; --border:#2E2419; --border2:#3A2C1E;
+    --text:#E8DCC8; --muted:#9C8A72; --muted2:#6B5A45; --gold:#C9A15C; --oxblood:#8B3A2F;
+    --good:#7fae82; --bad:#b6564a;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    -webkit-tap-highlight-color:transparent;}
+  body{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);}
+  h1,h2,h3{font-family:Georgia,'Iowan Old Style','Times New Roman',serif;font-weight:normal;margin:0;}
+  input,select,textarea,button{font-family:inherit;font-size:15px;}
+  input,select,textarea{background:var(--surface2);border:1px solid var(--border2);color:var(--text);
+    border-radius:4px;padding:11px 12px;width:100%;outline:none;}
+  input:focus,select:focus,textarea:focus{border-color:var(--gold);}
+  button{cursor:pointer;}
+  .app{max-width:520px;margin:0 auto;min-height:100vh;position:relative;}
+  .hidden{display:none !important;}
+
+  /* Gate */
+  .gate-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
+    background:radial-gradient(ellipse at top, #241A13 0%, #17110C 70%);}
+  .gate-card{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--border2);
+    border-radius:6px;padding:30px 24px;box-shadow:0 20px 60px rgba(0,0,0,.5);}
+  .seal{width:52px;height:52px;border-radius:50%;border:1px solid var(--gold);color:var(--gold);
+    display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;font-size:18px;
+    letter-spacing:2px;margin:0 auto 14px;}
+  .gate-title{text-align:center;font-size:23px;letter-spacing:.5px;margin-bottom:6px;}
+  .gate-sub{text-align:center;font-size:12.5px;color:var(--muted);margin-bottom:22px;line-height:1.5;}
+  .tab-row{display:flex;gap:4px;background:var(--surface2);border-radius:5px;padding:4px;margin-bottom:20px;}
+  .tab-btn{flex:1;padding:8px 4px;background:transparent;border:none;color:var(--muted);font-size:11px;
+    border-radius:4px;}
+  .tab-btn.active{background:var(--border2);color:var(--text);}
+  .field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px;}
+  .field label{font-size:11px;color:var(--muted);letter-spacing:.3px;}
+  .primary-btn{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--gold);
+    color:#1C1410;border:none;border-radius:4px;padding:13px 16px;font-size:14px;font-weight:600;
+    width:100%;margin-top:6px;}
+  .ghost-btn{background:transparent;border:1px solid var(--border2);color:var(--text);border-radius:4px;
+    padding:11px 16px;}
+  .age-note{font-size:10.5px;color:var(--muted2);text-align:center;margin-top:18px;line-height:1.5;}
+  .msg{font-size:12px;padding:9px 11px;border-radius:4px;margin-bottom:12px;}
+  .msg.err{background:#3a201d;color:#e6a49c;}
+  .msg.ok{background:#20301f;color:#a9d4ab;}
+
+  /* App shell */
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:18px 16px;
+    border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:5;}
+  .topbar .title{font-size:18px;}
+  .topbar .subtitle{font-size:11px;color:var(--muted);margin-top:2px;}
+  .icon-btn{background:transparent;border:1px solid var(--border2);color:var(--text);border-radius:20px;
+    width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:15px;}
+  .cart-btn{display:flex;align-items:center;gap:6px;background:var(--border2);border:none;color:var(--text);
+    border-radius:20px;padding:8px 14px;font-size:13px;}
+  .topbar-right{display:flex;align-items:center;gap:10px;}
+
+  .content{padding:16px;}
+  .cat-row{display:flex;gap:8px;overflow-x:auto;margin-bottom:16px;padding-bottom:2px;}
+  .cat-btn{white-space:nowrap;background:transparent;border:1px solid var(--border2);color:var(--muted);
+    border-radius:20px;padding:7px 14px;font-size:12.5px;}
+  .cat-btn.active{background:var(--gold);color:#1C1410;border-color:var(--gold);}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .p-card{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:6px;
+    padding:13px;display:flex;flex-direction:column;}
+  .p-badge{position:absolute;top:10px;right:10px;font-size:9px;color:#8B6A3E;text-transform:uppercase;
+    letter-spacing:.4px;}
+  .p-img{height:70px;display:flex;align-items:center;justify-content:center;background:var(--surface2);
+    border-radius:4px;margin-bottom:10px;font-size:24px;color:#4A3A28;}
+  .p-title{font-size:13.5px;margin-bottom:4px;line-height:1.3;}
+  .p-desc{font-size:10.5px;color:var(--muted);line-height:1.4;margin-bottom:8px;flex:1;}
+  .p-foot{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .p-price{font-size:14px;color:var(--gold);font-weight:600;}
+  .p-stock{font-size:9.5px;color:var(--muted2);}
+  .add-btn{background:var(--border2);border:none;color:var(--text);border-radius:4px;padding:8px;
+    font-size:12px;width:100%;}
+  .add-btn:disabled{opacity:.4;}
+
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:18px;margin-top:4px;}
+  .panel-title{font-size:18px;margin:4px 0 12px;}
+  .back-link{background:none;border:none;color:var(--muted);font-size:12px;padding:0;margin-bottom:10px;}
+  .section-label{font-size:11.5px;color:var(--gold);letter-spacing:.5px;text-transform:uppercase;
+    margin:18px 0 10px;}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+
+  .cart-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;
+    border-bottom:1px solid var(--border);gap:8px;}
+  .cart-row-name{font-size:13.5px;}
+  .cart-row-sub{font-size:11px;color:var(--muted);}
+  .qty-group{display:flex;align-items:center;gap:8px;}
+  .qty-btn{width:26px;height:26px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);
+    border-radius:4px;}
+  .total-row{display:flex;justify-content:space-between;font-size:16px;padding:16px 0;
+    border-top:1px solid var(--border);margin:6px 0 14px;font-family:Georgia,serif;}
+  .small-note{font-size:10.5px;color:var(--muted2);margin:4px 0 14px;}
+  .empty{color:var(--muted2);font-size:13px;padding:24px 0;text-align:center;}
+
+  .admin-tabs{display:flex;gap:6px;overflow-x:auto;padding:12px 16px 0;}
+  .admin-tab{white-space:nowrap;background:transparent;border:1px solid var(--border2);color:var(--muted);
+    border-radius:20px;padding:7px 14px;font-size:12px;}
+  .admin-tab.active{background:var(--gold);color:#1C1410;border-color:var(--gold);}
+
+  .table-row{display:flex;align-items:center;gap:8px;padding:12px 0;border-bottom:1px solid var(--border);
+    font-size:12.5px;}
+  .table-row .flex2{flex:2;} .table-row .flex1{flex:1;}
+  .sm-btn{background:transparent;border:1px solid var(--border2);color:var(--text);border-radius:4px;
+    padding:6px 10px;font-size:11px;}
+
+  .order-card{border:1px solid var(--border);border-radius:5px;padding:13px;margin-bottom:10px;}
+  .order-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;}
+  .order-items{font-size:11.5px;color:var(--muted);margin:8px 0 0;padding-left:18px;}
+
+  .toast{position:fixed;top:max(14px, env(safe-area-inset-top));left:50%;transform:translateX(-50%);
+    z-index:50;color:var(--text);padding:10px 16px;border-radius:5px;font-size:13px;
+    box-shadow:0 8px 24px rgba(0,0,0,.4);white-space:nowrap;}
+
+  .install-banner{position:fixed;bottom:0;left:0;right:0;background:var(--gold);color:#1C1410;
+    padding:12px 16px;padding-bottom:calc(12px + env(safe-area-inset-bottom));font-size:12.5px;
+    display:flex;align-items:center;justify-content:space-between;gap:10px;z-index:40;}
+  .install-banner button{background:#1C1410;color:var(--gold);border:none;border-radius:4px;
+    padding:8px 12px;font-size:12px;white-space:nowrap;}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+/* ============================================================
+   THE PRIVATE RESERVE — standalone installable web app
+   Data lives in this browser's localStorage (per device).
+   To share one catalog/order-book across every customer's phone,
+   point the DB_* functions below at a real backend (e.g. Supabase,
+   Firebase) instead of localStorage — everything else stays the same.
+============================================================ */
+
+const CATEGORIES = ["Cigars","Spirits","Accessories"];
+const SEED_PRODUCTS = [
+  {id:"p1",name:"Vitola Oscuro No. 4",category:"Cigars",price:24,stock:40,description:"Full-bodied Nicaraguan puro, notes of espresso and dark cocoa.",image:""},
+  {id:"p2",name:"Reserva Añejo Rum, 12yr",category:"Spirits",price:68,stock:18,description:"Small-batch rum aged in charred oak, caramel and orange peel finish.",image:""},
+  {id:"p3",name:"Cedar-Lined Travel Humidor",category:"Accessories",price:145,stock:12,description:"Holds 20 cigars, Spanish cedar interior, brass hygrometer.",image:""},
+  {id:"p4",name:"Connecticut Shade Robusto",category:"Cigars",price:16,stock:60,description:"Mild, creamy wrapper, cedar and toasted almond.",image:""},
+  {id:"p5",name:"Single Malt, Islay Cask",category:"Spirits",price:92,stock:10,description:"Peat smoke, sea salt, dried fruit — 15 year expression.",image:""},
+  {id:"p6",name:"Guillotine Cutter, Brass",category:"Accessories",price:38,stock:25,description:"Double-blade, hand-finished brass housing.",image:""}
+];
+
+const SUPABASE_URL = "https://njlrcamdlghcvzkwpbff.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qbHJjYW1kbGdoY3Z6a3dwYmZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1Nzg5MjIsImV4cCI6MjA5OTE1NDkyMn0.ul4nyNg2Lbwl3LKJ2qW6ogOw_xkgNYRwuAApOHO8CKI";
+const SHARED_KEYS = ["pr_products","pr_members","pr_invites","pr_orders","pr_admin_pass"];
+
+function sbHeaders(extra){
+  return Object.assign({
+    "apikey": SUPABASE_ANON_KEY,
+    "Authorization": "Bearer " + SUPABASE_ANON_KEY,
+    "Content-Type": "application/json"
+  }, extra || {});
+}
+async function sbFetchAll(){
+  const url = `${SUPABASE_URL}/rest/v1/app_data?select=key,value&key=in.(${SHARED_KEYS.join(",")})`;
+  const res = await fetch(url, { headers: sbHeaders() });
+  if(!res.ok) throw new Error("Supabase fetch failed: " + res.status);
+  const rows = await res.json();
+  const map = {};
+  rows.forEach(r => map[r.key] = r.value);
+  return map;
+}
+async function sbUpsert(key, value){
+  const url = `${SUPABASE_URL}/rest/v1/app_data?on_conflict=key`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: sbHeaders({ "Prefer": "resolution=merge-duplicates,return=minimal" }),
+    body: JSON.stringify([{ key, value }])
+  });
+  if(!res.ok) throw new Error("Supabase upsert failed: " + res.status);
+}
+async function pushShared(){
+  try{
+    await Promise.all([
+      sbUpsert("pr_products", STATE.products),
+      sbUpsert("pr_members", STATE.members),
+      sbUpsert("pr_invites", STATE.invites),
+      sbUpsert("pr_orders", STATE.orders),
+      sbUpsert("pr_admin_pass", STATE.adminPass),
+    ]);
+    dbSet("pr_products", STATE.products); dbSet("pr_members", STATE.members);
+    dbSet("pr_invites", STATE.invites); dbSet("pr_orders", STATE.orders);
+    dbSet("pr_admin_pass", STATE.adminPass);
+  }catch(e){
+    console.error("sync failed", e);
+    flash("Couldn't sync to the server — changes saved on this device only for now.", "err");
+  }
+}
+async function pullShared(showFlash){
+  try{
+    const remote = await sbFetchAll();
+    if(remote.pr_products) STATE.products = remote.pr_products;
+    if(remote.pr_members) STATE.members = remote.pr_members;
+    if(remote.pr_invites) STATE.invites = remote.pr_invites;
+    if(remote.pr_orders) STATE.orders = remote.pr_orders;
+    if(remote.pr_admin_pass) STATE.adminPass = remote.pr_admin_pass;
+    dbSet("pr_products", STATE.products); dbSet("pr_members", STATE.members);
+    dbSet("pr_invites", STATE.invites); dbSet("pr_orders", STATE.orders);
+    dbSet("pr_admin_pass", STATE.adminPass);
+    if(showFlash) flash("Refreshed.");
+    return true;
+  }catch(e){
+    console.error("pull failed", e);
+    if(showFlash) flash("Couldn't reach the server — showing the last saved copy.", "err");
+    return false;
+  }
+}
+
+const money = n => "$" + Number(n).toFixed(2);
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const genCode = () => Array.from({length:8},()=> "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random()*32)]).join("");
+const genId = p => p+"_"+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const genOrderNo = () => "PR-"+Math.floor(100000+Math.random()*900000);
+
+/* ---- storage layer (swap for a real backend later) ---- */
+function dbGet(key, fallback){ try{ const v=localStorage.getItem(key); return v?JSON.parse(v):fallback; }catch(e){ return fallback; } }
+function dbSet(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ console.error(e); } }
+
+let STATE = {
+  products: dbGet("pr_products", null) || SEED_PRODUCTS,
+  members: dbGet("pr_members", {}),
+  invites: dbGet("pr_invites", {}),
+  orders: dbGet("pr_orders", []),
+  adminPass: dbGet("pr_admin_pass", "humidor21"),
+  session: dbGet("pr_session", null),
+  gateTab: "signin",
+  storeScreen: "shop",
+  category: "All",
+  cart: {},
+  adminTab: "products",
+  lastOrder: null,
+  toast: null,
+  productForm: null, // editing product id or null
+};
+if(!dbGet("pr_products", null)) dbSet("pr_products", SEED_PRODUCTS);
+
+function persist(){
+  dbSet("pr_session", STATE.session); // session stays local to this device on purpose
+  pushShared(); // fire-and-forget sync of products/members/invites/orders/adminPass to Supabase
+}
+function flash(msg, kind){
+  STATE.toast = {msg, kind: kind||"ok"};
+  render();
+  setTimeout(()=>{ STATE.toast=null; render(); }, 3000);
+}
+function setState(patch){ Object.assign(STATE, patch); persist(); render(); }
+
+/* ================= RENDER ================= */
+function render(){
+  const root = document.getElementById("root");
+  root.innerHTML = STATE.session ? renderApp() : renderGate();
+  bindEvents();
+  const t = document.getElementById("toast");
+  // toast already in markup via renderApp/renderGate top-level wrapper
+}
+
+function renderGate(){
+  const t = STATE.gateTab;
+  return `
+  <div class="gate-wrap">
+    <div class="gate-card">
+      <div class="seal">PR</div>
+      <h1 class="gate-title">The Private Reserve</h1>
+      <p class="gate-sub">Members-only. Cigars, spirits &amp; accessories. Access by invitation.</p>
+      <div class="tab-row">
+        <button class="tab-btn ${t==='signin'?'active':''}" data-act="gatetab" data-val="signin">Sign In</button>
+        <button class="tab-btn ${t==='redeem'?'active':''}" data-act="gatetab" data-val="redeem">Redeem Invite</button>
+        <button class="tab-btn ${t==='proprietor'?'active':''}" data-act="gatetab" data-val="proprietor">Proprietor</button>
+      </div>
+      ${STATE.toast ? `<div class="msg ${STATE.toast.kind}">${esc(STATE.toast.msg)}</div>` : ""}
+      ${t==='signin' ? `
+        <div class="field"><label>Email</label><input id="in-email" type="email" placeholder="you@example.com"/></div>
+        <div class="field"><label>Password</label><input id="in-pass" type="password" placeholder="••••••••"/></div>
+        <button class="primary-btn" data-act="signin">Enter the Reserve</button>
+      ` : t==='redeem' ? `
+        <div class="field"><label>Invite code</label><input id="rd-code" style="letter-spacing:2px;text-transform:uppercase" placeholder="XXXXXXXX"/></div>
+        <div class="field"><label>Full name</label><input id="rd-name" placeholder="Jordan Blake"/></div>
+        <div class="field"><label>Email</label><input id="rd-email" type="email" placeholder="you@example.com"/></div>
+        <div class="field"><label>Set a password</label><input id="rd-pass" type="password" placeholder="4+ characters"/></div>
+        <button class="primary-btn" data-act="redeem">Activate Membership</button>
+      ` : `
+        <div class="field"><label>Proprietor passcode</label><input id="ad-pass" type="password" placeholder="••••••••"/></div>
+        <button class="primary-btn" data-act="adminlogin">Enter Back Office</button>
+      `}
+      <p class="age-note">You must be of legal purchase age for tobacco and alcohol in your jurisdiction to hold a membership here.</p>
+    </div>
+  </div>`;
+}
+
+function renderApp(){
+  const s = STATE.session;
+  return `
+    ${STATE.toast ? `<div class="toast" style="background:${STATE.toast.kind==='err'?'#5c2420':'#2c3d2e'}">${esc(STATE.toast.msg)}</div>` : ""}
+    <div class="app">
+      ${s.type==='admin' ? renderAdmin() : renderStore()}
+    </div>
+    <div id="install-banner"></div>
+  `;
+}
+
+function renderTopbar(title, subtitle, rightHtml){
+  return `<div class="topbar">
+    <div><div class="title">${esc(title)}</div><div class="subtitle">${esc(subtitle||"")}</div></div>
+    <div class="topbar-right">${rightHtml}</div>
+  </div>`;
+}
+
+/* ---------- STORE ---------- */
+function cartItems(){
+  return Object.entries(STATE.cart).map(([id,qty])=>{
+    const product = STATE.products.find(p=>p.id===id);
+    return product ? {product, qty} : null;
+  }).filter(Boolean);
+}
+function cartCount(){ return cartItems().reduce((s,c)=>s+c.qty,0); }
+function cartTotal(){ return cartItems().reduce((s,c)=>s+c.qty*c.product.price,0); }
+
+function renderStore(){
+  const right = `<button class="icon-btn" data-act="refresh" title="Refresh">⟳</button>
+    <button class="cart-btn" data-act="gostore" data-val="cart">🛍 ${cartCount()}</button>
+    <button class="icon-btn" data-act="logout">⏻</button>`;
+  let body = "";
+  if(STATE.storeScreen === "shop"){
+    const visible = STATE.category==="All" ? STATE.products : STATE.products.filter(p=>p.category===STATE.category);
+    body = `
+      <div class="cat-row">
+        ${["All",...CATEGORIES].map(c=>`<button class="cat-btn ${STATE.category===c?'active':''}" data-act="setcat" data-val="${c}">${esc(c)}</button>`).join("")}
+      </div>
+      <div class="grid">
+        ${visible.map(p=>`
+          <div class="p-card">
+            <div class="p-badge">${esc(p.category)}</div>
+            <div class="p-img">${p.image?`<img src="${esc(p.image)}" style="width:100%;height:100%;object-fit:cover;border-radius:4px"/>`: (p.category==="Cigars"?"🚬":p.category==="Spirits"?"🥃":"📦")}</div>
+            <div class="p-title">${esc(p.name)}</div>
+            <div class="p-desc">${esc(p.description)}</div>
+            <div class="p-foot">
+              <span class="p-price">${money(p.price)}</span>
+              <span class="p-stock" style="${p.stock===0?'color:var(--bad)':''}">${p.stock===0?"Out of stock":p.stock+" in stock"}</span>
+            </div>
+            <button class="add-btn" data-act="addcart" data-val="${p.id}" ${p.stock===0?"disabled":""}>+ Add</button>
+          </div>
+        `).join("") || `<div class="empty" style="grid-column:1/-1">Nothing in this category yet.</div>`}
+      </div>`;
+  } else if(STATE.storeScreen === "cart"){
+    const items = cartItems();
+    body = `<div class="panel">
+      <button class="back-link" data-act="gostore" data-val="shop">← Continue shopping</button>
+      <h2 class="panel-title">Your Cart</h2>
+      ${items.length===0? `<div class="empty">Your cart is empty.</div>` : items.map(c=>`
+        <div class="cart-row">
+          <div><div class="cart-row-name">${esc(c.product.name)}</div><div class="cart-row-sub">${money(c.product.price)} each</div></div>
+          <div class="qty-group">
+            <button class="qty-btn" data-act="qty" data-id="${c.product.id}" data-delta="-1">−</button>
+            <span>${c.qty}</span>
+            <button class="qty-btn" data-act="qty" data-id="${c.product.id}" data-delta="1">+</button>
+          </div>
+          <div style="width:64px;text-align:right">${money(c.qty*c.product.price)}</div>
+        </div>`).join("")}
+      ${items.length>0? `
+        <div class="total-row"><span>Total</span><span>${money(cartTotal())}</span></div>
+        <button class="primary-btn" data-act="gostore" data-val="checkout">Proceed to Checkout →</button>
+      `:""}
+    </div>`;
+  } else if(STATE.storeScreen === "checkout"){
+    body = `<div class="panel">
+      <button class="back-link" data-act="gostore" data-val="cart">← Back to cart</button>
+      <h2 class="panel-title">Checkout</h2>
+      <div class="total-row"><span>Order Total</span><span>${money(cartTotal())}</span></div>
+      <p class="small-note" style="font-size:12px;color:var(--muted)">You'll enter shipping and card details on Stripe's secure payment page — nothing sensitive is handled by this app directly.</p>
+      <button class="primary-btn" id="pay-btn" data-act="stripepay">Pay ${money(cartTotal())} Securely</button>
+    </div>`;
+  } else if(STATE.storeScreen === "confirm" && STATE.lastOrder){
+    const o = STATE.lastOrder;
+    body = `<div class="panel">
+      <h2 class="panel-title">✓ Order Confirmed</h2>
+      <p class="cart-row-sub">Order <strong>${esc(o.orderNo)}</strong> — ${money(o.total)}.<br/>Shipping to ${esc(o.shipping.address)}, ${esc(o.shipping.city)}, ${esc(o.shipping.state)} ${esc(o.shipping.zip)}.</p>
+      <button class="primary-btn" data-act="gostore" data-val="shop">Back to Shop</button>
+    </div>`;
+  }
+  return renderTopbar("The Private Reserve", "Welcome, "+s_name(), right) + `<div class="content">${body}</div>`;
+}
+function s_name(){ return STATE.session && STATE.session.name ? STATE.session.name : ""; }
+
+/* ---------- ADMIN ---------- */
+function renderAdmin(){
+  const tabs = [["products","Products"],["orders","Orders"],["members","Members"],["invites","Invite Codes"],["settings","Settings"]];
+  const right = `<button class="icon-btn" data-act="refresh" title="Refresh">⟳</button>
+    <button class="icon-btn" data-act="logout">⏻</button>`;
+  const tabRow = `<div class="admin-tabs">${tabs.map(([k,l])=>`<button class="admin-tab ${STATE.adminTab===k?'active':''}" data-act="admintab" data-val="${k}">${l}</button>`).join("")}</div>`;
+  let body = "";
+  if(STATE.adminTab==="products") body = renderProductsAdmin();
+  else if(STATE.adminTab==="orders") body = renderOrdersAdmin();
+  else if(STATE.adminTab==="members") body = renderMembersAdmin();
+  else if(STATE.adminTab==="invites") body = renderInvitesAdmin();
+  else if(STATE.adminTab==="settings") body = renderSettingsAdmin();
+  return renderTopbar("Back Office", "Private Reserve — Proprietor View", right) + tabRow + `<div class="content">${body}</div>`;
+}
+
+function renderProductsAdmin(){
+  const editing = STATE.productForm;
+  const f = editing ? STATE.products.find(p=>p.id===editing) : null;
+  return `<div class="panel">
+    <h3 class="section-label">${f?"Edit Product":"Add Product"}</h3>
+    <div class="row2">
+      <div class="field"><label>Name</label><input id="pf-name" value="${esc(f?f.name:'')}"/></div>
+      <div class="field"><label>Category</label>
+        <select id="pf-cat">${CATEGORIES.map(c=>`<option value="${c}" ${f&&f.category===c?'selected':''}>${c}</option>`).join("")}</select>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Price ($)</label><input id="pf-price" type="number" value="${f?f.price:''}"/></div>
+      <div class="field"><label>Stock</label><input id="pf-stock" type="number" value="${f?f.stock:''}"/></div>
+    </div>
+    <div class="field"><label>Image URL (optional)</label><input id="pf-img" value="${esc(f?f.image:'')}"/></div>
+    <div class="field"><label>Description</label><textarea id="pf-desc" style="min-height:60px">${esc(f?f.description:'')}</textarea></div>
+    <div style="display:flex;gap:10px">
+      <button class="primary-btn" data-act="saveproduct" data-val="${editing||''}">${f?"Save Changes":"Add Product"}</button>
+      ${f?`<button class="ghost-btn" data-act="canceledit">Cancel</button>`:""}
+    </div>
+    <h3 class="section-label" style="margin-top:26px">Catalog (${STATE.products.length})</h3>
+    ${STATE.products.map(p=>`
+      <div class="table-row">
+        <div class="flex2"><div class="cart-row-name">${esc(p.name)}</div><div class="cart-row-sub">${esc(p.category)}</div></div>
+        <div class="flex1">${money(p.price)}</div>
+        <div class="flex1" style="${p.stock===0?'color:var(--bad)':''}">${p.stock} in stock</div>
+        <button class="sm-btn" data-act="editproduct" data-val="${p.id}">Edit</button>
+        <button class="sm-btn" data-act="delproduct" data-val="${p.id}">Del</button>
+      </div>
+    `).join("") || `<div class="empty">No products yet.</div>`}
+  </div>`;
+}
+
+function renderOrdersAdmin(){
+  const statuses = ["Received","Processing","Shipped","Delivered","Cancelled"];
+  return `<div class="panel">
+    <h3 class="section-label">Orders (${STATE.orders.length})</h3>
+    ${STATE.orders.length===0?`<div class="empty">No orders yet.</div>`:""}
+    ${STATE.orders.map(o=>`
+      <div class="order-card">
+        <div class="order-head">
+          <div><div class="cart-row-name">${esc(o.orderNo)} — ${money(o.total)}</div>
+          <div class="cart-row-sub">${esc(o.memberName)} (${esc(o.memberEmail)}) · ${new Date(o.createdAt).toLocaleString()}</div></div>
+          <select data-act="orderstatus" data-val="${o.id}" style="width:140px">
+            ${statuses.map(st=>`<option ${o.status===st?'selected':''}>${st}</option>`).join("")}
+          </select>
+        </div>
+        <div class="cart-row-sub">Ship to: ${esc(o.shipping.address)}, ${esc(o.shipping.city)}, ${esc(o.shipping.state)} ${esc(o.shipping.zip)} · card •••• ${esc(o.cardLast4)}</div>
+        <ul class="order-items">${o.items.map(it=>`<li>${it.qty} × ${esc(it.name)} — ${money(it.price*it.qty)}</li>`).join("")}</ul>
+      </div>
+    `).join("")}
+  </div>`;
+}
+
+function renderMembersAdmin(){
+  const list = Object.values(STATE.members).sort((a,b)=>b.joinedAt-a.joinedAt);
+  return `<div class="panel">
+    <h3 class="section-label">Members (${list.length})</h3>
+    ${list.length===0?`<div class="empty">No members yet — generate an invite code to bring someone in.</div>`:""}
+    ${list.map(m=>`
+      <div class="table-row">
+        <div class="flex2"><div class="cart-row-name">${esc(m.name)}</div><div class="cart-row-sub">${esc(m.email)}</div></div>
+        <div class="flex1">${new Date(m.joinedAt).toLocaleDateString()}</div>
+        <div class="flex1" style="color:${m.active?'var(--good)':'var(--bad)'}">${m.active?"Active":"Suspended"}</div>
+        <button class="sm-btn" data-act="togglemember" data-val="${esc(m.email)}">${m.active?"Suspend":"Reinstate"}</button>
+      </div>
+    `).join("")}
+  </div>`;
+}
+
+function renderInvitesAdmin(){
+  const list = Object.entries(STATE.invites).sort((a,b)=>(b[1].createdAt||0)-(a[1].createdAt||0));
+  return `<div class="panel">
+    <button class="primary-btn" data-act="geninvite">🎟 Generate Invite Code</button>
+    <h3 class="section-label" style="margin-top:22px">Codes (${list.length})</h3>
+    ${list.length===0?`<div class="empty">No invite codes yet.</div>`:""}
+    ${list.map(([code,info])=>`
+      <div class="table-row">
+        <div class="flex2" style="font-family:monospace;letter-spacing:1px">${esc(code)}</div>
+        <div class="flex1" style="color:${info.used?'var(--bad)':'var(--good)'}">${info.used?"Redeemed":"Unused"}</div>
+        <div class="flex1">${new Date(info.createdAt).toLocaleDateString()}</div>
+        ${!info.used?`<button class="sm-btn" data-act="revokeinvite" data-val="${esc(code)}">Revoke</button>`:""}
+      </div>
+    `).join("")}
+  </div>`;
+}
+
+function renderSettingsAdmin(){
+  return `<div class="panel">
+    <h3 class="section-label">Proprietor Passcode</h3>
+    <p class="cart-row-sub" style="margin-bottom:12px">This passcode reaches the Back Office from the entry screen. Keep it private.</p>
+    <div class="field"><label>Passcode</label><input id="set-pass" value="${esc(STATE.adminPass)}"/></div>
+    <button class="primary-btn" data-act="savepass">Save Passcode</button>
+  </div>`;
+}
+
+/* ================= EVENTS ================= */
+function bindEvents(){
+  document.querySelectorAll("[data-act]").forEach(el=>{
+    el.addEventListener(el.tagName==="SELECT"?"change":"click", handleAction);
+  });
+}
+
+function handleAction(e){
+  const el = e.currentTarget;
+  const act = el.dataset.act;
+  const val = el.dataset.val;
+
+  if(act==="gatetab"){ STATE.gateTab = val; STATE.toast=null; render(); }
+
+  else if(act==="signin"){
+    const email = document.getElementById("in-email").value.trim().toLowerCase();
+    const pass = document.getElementById("in-pass").value;
+    const m = STATE.members[email];
+    if(!m || !m.active) return flash("No active membership found for that email.","err");
+    if(m.password !== pass) return flash("Incorrect password.","err");
+    setState({session:{type:"member", email:m.email, name:m.name}, storeScreen:"shop"});
+    pullShared(false).then(()=>render());
+  }
+
+  else if(act==="redeem"){
+    const code = document.getElementById("rd-code").value.trim().toUpperCase();
+    const name = document.getElementById("rd-name").value.trim();
+    const email = document.getElementById("rd-email").value.trim().toLowerCase();
+    const pass = document.getElementById("rd-pass").value;
+    const invite = STATE.invites[code];
+    if(!invite || invite.used) return flash("That invite code is invalid or already used.","err");
+    if(!name || !email || pass.length<4) return flash("Fill in your name, email, and a password (4+ characters).","err");
+    if(STATE.members[email]) return flash("An account with that email already exists — sign in instead.","err");
+    STATE.invites[code] = {...invite, used:true, usedAt:Date.now()};
+    STATE.members[email] = {email, name, password:pass, active:true, joinedAt:Date.now(), invitedBy:code};
+    setState({session:{type:"member", email, name}, storeScreen:"shop"});
+    flash("Membership activated. Welcome in.");
+  }
+
+  else if(act==="adminlogin"){
+    const pass = document.getElementById("ad-pass").value;
+    if(pass !== STATE.adminPass) return flash("Incorrect proprietor passcode.","err");
+    setState({session:{type:"admin"}, adminTab:"products"});
+    pullShared(false).then(()=>render());
+  }
+
+  else if(act==="logout"){ setState({session:null, cart:{}}); }
+
+  else if(act==="refresh"){ pullShared(true).then(()=>render()); }
+
+  else if(act==="gostore"){ STATE.storeScreen = val; render(); }
+  else if(act==="setcat"){ STATE.category = val; render(); }
+
+  else if(act==="addcart"){
+    const p = STATE.products.find(pp=>pp.id===val);
+    if(!p) return;
+    if((STATE.cart[val]||0) >= p.stock) return flash("No more in stock.","err");
+    STATE.cart[val] = (STATE.cart[val]||0)+1;
+    render();
+  }
+  else if(act==="qty"){
+    const id = el.dataset.id, delta = parseInt(el.dataset.delta,10);
+    const v = (STATE.cart[id]||0)+delta;
+    if(v<=0) delete STATE.cart[id]; else STATE.cart[id]=v;
+    render();
+  }
+
+  else if(act==="stripepay"){
+    const items = cartItems();
+    if(items.length===0) return flash("Your cart is empty.","err");
+    const btn = document.getElementById("pay-btn"); btn.disabled=true; btn.textContent="Redirecting to secure checkout…";
+    fetch("/.netlify/functions/create-checkout", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({
+        items: items.map(c=>({id:c.product.id, qty:c.qty})),
+        memberEmail: STATE.session.email,
+        memberName: STATE.session.name,
+        siteUrl: window.location.origin,
+      }),
+    })
+    .then(r=>r.json())
+    .then(data=>{
+      if(data.url) window.location.href = data.url;
+      else { flash(data.error || "Couldn't start checkout.","err"); btn.disabled=false; btn.textContent="Pay "+money(cartTotal())+" Securely"; }
+    })
+    .catch(()=>{ flash("Couldn't reach the payment service.","err"); btn.disabled=false; btn.textContent="Pay "+money(cartTotal())+" Securely"; });
+  }
+
+  else if(act==="admintab"){ STATE.adminTab = val; STATE.productForm=null; render(); }
+
+  else if(act==="editproduct"){ STATE.productForm = val; render(); }
+  else if(act==="canceledit"){ STATE.productForm = null; render(); }
+  else if(act==="delproduct"){
+    STATE.products = STATE.products.filter(p=>p.id!==val);
+    if(STATE.productForm===val) STATE.productForm=null;
+    setState({}); flash("Product removed.");
+  }
+  else if(act==="saveproduct"){
+    const name = document.getElementById("pf-name").value.trim();
+    const category = document.getElementById("pf-cat").value;
+    const price = parseFloat(document.getElementById("pf-price").value);
+    const stock = parseInt(document.getElementById("pf-stock").value,10)||0;
+    const image = document.getElementById("pf-img").value.trim();
+    const description = document.getElementById("pf-desc").value.trim();
+    if(!name || isNaN(price)) return flash("Name and price are required.","err");
+    if(val){
+      STATE.products = STATE.products.map(p=>p.id===val?{...p,name,category,price,stock,image,description}:p);
+      flash("Product updated.");
+    } else {
+      STATE.products = [{id:genId("prod"),name,category,price,stock,image,description}, ...STATE.products];
+      flash("Product added.");
+    }
+    STATE.productForm = null;
+    setState({});
+  }
+
+  else if(act==="orderstatus"){
+    const id = el.dataset.val, status = el.value;
+    STATE.orders = STATE.orders.map(o=>o.id===id?{...o,status}:o);
+    setState({});
+  }
+
+  else if(act==="togglemember"){
+    const email = val;
+    STATE.members[email] = {...STATE.members[email], active: !STATE.members[email].active};
+    setState({});
+  }
+
+  else if(act==="geninvite"){
+    const code = genCode();
+    STATE.invites[code] = {used:false, createdAt:Date.now()};
+    setState({});
+  }
+  else if(act==="revokeinvite"){
+    delete STATE.invites[val];
+    setState({});
+  }
+
+  else if(act==="savepass"){
+    const v = document.getElementById("set-pass").value;
+    if(v.length<4) return flash("Use at least 4 characters.","err");
+    STATE.adminPass = v;
+    setState({});
+    flash("Passcode updated.");
+  }
+}
+
+/* ================= PWA install prompt + service worker ================= */
+if("serviceWorker" in navigator){
+  window.addEventListener("load", ()=> navigator.serviceWorker.register("service-worker.js").catch(()=>{}));
+}
+let deferredInstallPrompt = null;
+window.addEventListener("beforeinstallprompt",(e)=>{
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  const banner = document.getElementById("install-banner");
+  if(banner) banner.innerHTML = `<div class="install-banner">
+    <span>Install this app on your phone for one-tap access.</span>
+    <button id="do-install">Install</button>
+  </div>`;
+  const btn = document.getElementById("do-install");
+  if(btn) btn.addEventListener("click", async ()=>{
+    banner.innerHTML="";
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+  });
+});
+function isIOS(){ return /iphone|ipad|ipod/i.test(navigator.userAgent); }
+function isStandalone(){ return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true; }
+
+async function boot(){
+  document.getElementById("root").innerHTML =
+    `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:#C9A15C;font-family:Georgia,serif;letter-spacing:1px">Loading the Reserve…</div>`;
+  const ok = await pullShared(false);
+  if(!ok && !dbGet("pr_products", null)){
+    pushShared();
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  if(params.get("order_success") === "1" && params.get("session_id") && STATE.session){
+    document.getElementById("root").innerHTML =
+      `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:#C9A15C;font-family:Georgia,serif;letter-spacing:1px">Confirming your payment…</div>`;
+    try{
+      const res = await fetch(`/.netlify/functions/verify-order?session_id=${encodeURIComponent(params.get("session_id"))}`);
+      const data = await res.json();
+      window.history.replaceState({}, "", window.location.pathname);
+      if(data.paid && data.order){
+        STATE.cart = {};
+        STATE.lastOrder = data.order;
+        STATE.storeScreen = "confirm";
+        await pullShared(false); // pick up the updated stock/orders this payment just wrote
+      } else {
+        STATE.storeScreen = "cart";
+        flash("We couldn't confirm that payment yet — check the Orders tab shortly, or contact support if it doesn't appear.", "err");
+      }
+    }catch(e){
+      window.history.replaceState({}, "", window.location.pathname);
+      flash("We couldn't confirm that payment — please check your email or contact support.", "err");
+    }
+  } else if(params.get("order_cancelled") === "1"){
+    window.history.replaceState({}, "", window.location.pathname);
+    if(STATE.session) STATE.storeScreen = "cart";
+    flash("Checkout cancelled — your cart is still here.", "err");
+  }
+
+  render();
+}
+boot();
+// iOS has no install prompt event — show manual instructions once, if not already installed.
+if(isIOS() && !isStandalone()){
+  const banner = document.getElementById("install-banner");
+  if(banner) banner.innerHTML = `<div class="install-banner">
+    <span>On iPhone: tap Share, then "Add to Home Screen".</span>
+    <button id="dismiss-ios">Got it</button>
+  </div>`;
+  const dbtn = document.getElementById("dismiss-ios");
+  if(dbtn) dbtn.addEventListener("click", ()=>{ document.getElementById("install-banner").innerHTML=""; });
+}
+</script>
+</body>
+</html>
