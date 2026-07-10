@@ -49,7 +49,7 @@ exports.handler = async (event) => {
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items,
-      shipping_address_collection: { allowed_countries: ["US", "CA"] },
+      shipping_address_collection: { allowed_countries: ["AU"] },
       customer_email: memberEmail,
       success_url: `${siteUrl}/?order_success=1&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/?order_cancelled=1`,
