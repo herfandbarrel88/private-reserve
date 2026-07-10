@@ -35,7 +35,7 @@ exports.handler = async (event) => {
     if (!sessionId) return { statusCode: 400, body: JSON.stringify({ error: "Missing session_id." }) };
 
     const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
-    const session = await stripe.checkout.sessions.retrieve(sessionId, { expand: ["shipping_details"] });
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
 
     if (session.payment_status !== "paid") {
       return { statusCode: 200, body: JSON.stringify({ paid: false }) };
