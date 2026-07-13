@@ -74,18 +74,6 @@
     border-radius:20px;padding:7px 14px;font-size:12.5px;}
   .cat-btn.active{background:var(--gold);color:#1C1410;border-color:var(--gold);}
 
-  .top-banner{background:var(--gold);color:#1C1410;text-align:center;font-size:12.5px;font-weight:600;
-    letter-spacing:.3px;padding:8px 12px;}
-
-  .home-links-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-  .home-link-box{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:0;
-    overflow:hidden;text-align:left;color:var(--text);display:flex;flex-direction:column;}
-  .home-link-img{height:110px;display:flex;align-items:center;justify-content:center;background:var(--surface2);
-    color:#4A3A28;font-size:22px;}
-  .home-link-label{padding:10px 12px;font-family:Georgia,serif;font-size:14px;}
-  .home-footer{text-align:center;font-size:12px;color:var(--muted);margin-top:26px;padding-top:16px;
-    border-top:1px solid var(--border);}
-
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
   .p-card{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:6px;
     padding:13px;display:flex;flex-direction:column;}
@@ -172,7 +160,7 @@ const SEED_PRODUCTS = [
 
 const SUPABASE_URL = "https://njlrcamdlghcvzkwpbff.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qbHJjYW1kbGdoY3Z6a3dwYmZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1Nzg5MjIsImV4cCI6MjA5OTE1NDkyMn0.ul4nyNg2Lbwl3LKJ2qW6ogOw_xkgNYRwuAApOHO8CKI";
-const SHARED_KEYS = ["pr_products","pr_members","pr_invites","pr_orders","pr_admin_pass","pr_home_links"];
+const SHARED_KEYS = ["pr_products","pr_members","pr_invites","pr_orders","pr_admin_pass"];
 
 function sbHeaders(extra){
   return Object.assign({
@@ -207,11 +195,10 @@ async function pushShared(){
       sbUpsert("pr_invites", STATE.invites),
       sbUpsert("pr_orders", STATE.orders),
       sbUpsert("pr_admin_pass", STATE.adminPass),
-      sbUpsert("pr_home_links", STATE.homeLinks),
     ]);
     dbSet("pr_products", STATE.products); dbSet("pr_members", STATE.members);
     dbSet("pr_invites", STATE.invites); dbSet("pr_orders", STATE.orders);
-    dbSet("pr_admin_pass", STATE.adminPass); dbSet("pr_home_links", STATE.homeLinks);
+    dbSet("pr_admin_pass", STATE.adminPass);
   }catch(e){
     console.error("sync failed", e);
     flash("Couldn't sync to the server — changes saved on this device only for now.", "err");
@@ -225,10 +212,9 @@ async function pullShared(showFlash){
     if(remote.pr_invites) STATE.invites = remote.pr_invites;
     if(remote.pr_orders) STATE.orders = remote.pr_orders;
     if(remote.pr_admin_pass) STATE.adminPass = remote.pr_admin_pass;
-    if(remote.pr_home_links) STATE.homeLinks = remote.pr_home_links;
     dbSet("pr_products", STATE.products); dbSet("pr_members", STATE.members);
     dbSet("pr_invites", STATE.invites); dbSet("pr_orders", STATE.orders);
-    dbSet("pr_admin_pass", STATE.adminPass); dbSet("pr_home_links", STATE.homeLinks);
+    dbSet("pr_admin_pass", STATE.adminPass);
     if(showFlash) flash("Refreshed.");
     return true;
   }catch(e){
@@ -248,25 +234,16 @@ const genOrderNo = () => "PR-"+Math.floor(100000+Math.random()*900000);
 function dbGet(key, fallback){ try{ const v=localStorage.getItem(key); return v?JSON.parse(v):fallback; }catch(e){ return fallback; } }
 function dbSet(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ console.error(e); } }
 
-const DEFAULT_HOME_LINKS = [
-  { image: "", label: "Cigars", category: "Cigars" },
-  { image: "", label: "Spirits", category: "Spirits" },
-  { image: "", label: "Accessories", category: "Accessories" },
-  { image: "", label: "", category: "Cigars" },
-  { image: "", label: "", category: "Cigars" },
-];
-
 let STATE = {
   products: dbGet("pr_products", null) || SEED_PRODUCTS,
   members: dbGet("pr_members", {}),
   invites: dbGet("pr_invites", {}),
   orders: dbGet("pr_orders", []),
   adminPass: dbGet("pr_admin_pass", "humidor21"),
-  homeLinks: dbGet("pr_home_links", null) || DEFAULT_HOME_LINKS,
   session: dbGet("pr_session", null),
   gateTab: "signin",
   storeScreen: "shop",
-  category: "Home",
+  category: "All",
   cart: {},
   adminTab: "products",
   lastOrder: null,
@@ -274,7 +251,6 @@ let STATE = {
   productForm: null, // editing product id or null
 };
 if(!dbGet("pr_products", null)) dbSet("pr_products", SEED_PRODUCTS);
-if(!dbGet("pr_home_links", null)) dbSet("pr_home_links", DEFAULT_HOME_LINKS);
 
 function persist(){
   dbSet("pr_session", STATE.session); // session stays local to this device on purpose
@@ -299,7 +275,6 @@ function render(){
 function renderGate(){
   const t = STATE.gateTab;
   return `
-  <div class="top-banner">FREE delivery across Australia</div>
   <div class="gate-wrap">
     <div class="gate-card">
       <div class="seal">PR</div>
@@ -334,7 +309,6 @@ function renderApp(){
   const s = STATE.session;
   return `
     ${STATE.toast ? `<div class="toast" style="background:${STATE.toast.kind==='err'?'#5c2420':'#2c3d2e'}">${esc(STATE.toast.msg)}</div>` : ""}
-    <div class="top-banner">FREE delivery across Australia</div>
     <div class="app">
       ${s.type==='admin' ? renderAdmin() : renderStore()}
     </div>
@@ -365,27 +339,10 @@ function renderStore(){
     <button class="icon-btn" data-act="logout">⏻</button>`;
   let body = "";
   if(STATE.storeScreen === "shop"){
-    if(STATE.category === "Home"){
-      const links = STATE.homeLinks || DEFAULT_HOME_LINKS;
-      body = `
+    const visible = STATE.category==="All" ? STATE.products : STATE.products.filter(p=>p.category===STATE.category);
+    body = `
       <div class="cat-row">
-        ${["Home",...CATEGORIES].map(c=>`<button class="cat-btn ${STATE.category===c?'active':''}" data-act="setcat" data-val="${c}">${esc(c)}</button>`).join("")}
-      </div>
-      <div class="home-links-grid">
-        ${links.map((l,i)=>`
-          <button class="home-link-box" data-act="setcat" data-val="${esc(l.category)}">
-            <div class="home-link-img">${l.image?`<img src="${esc(l.image)}" style="width:100%;height:100%;object-fit:cover;border-radius:4px"/>`:`<span class="p-img-fallback">+</span>`}</div>
-            <div class="home-link-label">${esc(l.label || l.category)}</div>
-          </button>
-        `).join("")}
-      </div>
-      <div class="home-footer">Cigar Brothers — Contact us 0414790053</div>
-      `;
-    } else {
-      const visible = STATE.products.filter(p=>p.category===STATE.category);
-      body = `
-      <div class="cat-row">
-        ${["Home",...CATEGORIES].map(c=>`<button class="cat-btn ${STATE.category===c?'active':''}" data-act="setcat" data-val="${c}">${esc(c)}</button>`).join("")}
+        ${["All",...CATEGORIES].map(c=>`<button class="cat-btn ${STATE.category===c?'active':''}" data-act="setcat" data-val="${c}">${esc(c)}</button>`).join("")}
       </div>
       <div class="grid">
         ${visible.map(p=>`
@@ -402,7 +359,6 @@ function renderStore(){
           </div>
         `).join("") || `<div class="empty" style="grid-column:1/-1">Nothing in this category yet.</div>`}
       </div>`;
-    }
   } else if(STATE.storeScreen === "cart"){
     const items = cartItems();
     body = `<div class="panel">
@@ -445,7 +401,7 @@ function s_name(){ return STATE.session && STATE.session.name ? STATE.session.na
 
 /* ---------- ADMIN ---------- */
 function renderAdmin(){
-  const tabs = [["products","Products"],["orders","Orders"],["members","Members"],["invites","Invite Codes"],["homepage","Home Page"],["settings","Settings"]];
+  const tabs = [["products","Products"],["orders","Orders"],["members","Members"],["invites","Invite Codes"],["settings","Settings"]];
   const right = `<button class="icon-btn" data-act="refresh" title="Refresh">⟳</button>
     <button class="icon-btn" data-act="logout">⏻</button>`;
   const tabRow = `<div class="admin-tabs">${tabs.map(([k,l])=>`<button class="admin-tab ${STATE.adminTab===k?'active':''}" data-act="admintab" data-val="${k}">${l}</button>`).join("")}</div>`;
@@ -454,7 +410,6 @@ function renderAdmin(){
   else if(STATE.adminTab==="orders") body = renderOrdersAdmin();
   else if(STATE.adminTab==="members") body = renderMembersAdmin();
   else if(STATE.adminTab==="invites") body = renderInvitesAdmin();
-  else if(STATE.adminTab==="homepage") body = renderHomePageAdmin();
   else if(STATE.adminTab==="settings") body = renderSettingsAdmin();
   return renderTopbar("Back Office", "Private Reserve — Proprietor View", right) + tabRow + `<div class="content">${body}</div>`;
 }
@@ -544,27 +499,6 @@ function renderInvitesAdmin(){
         ${!info.used?`<button class="sm-btn" data-act="revokeinvite" data-val="${esc(code)}">Revoke</button>`:""}
       </div>
     `).join("")}
-  </div>`;
-}
-
-function renderHomePageAdmin(){
-  const links = STATE.homeLinks || DEFAULT_HOME_LINKS;
-  return `<div class="panel">
-    <h3 class="section-label">Home Page Link Boxes</h3>
-    <p class="cart-row-sub" style="margin-bottom:14px">These 5 boxes are what members see on the Home tab. Each one links to a category — tap it to browse those products. Add an image URL, a label, and pick which category it opens.</p>
-    ${links.map((l,i)=>`
-      <div style="border:1px solid var(--border);border-radius:5px;padding:12px;margin-bottom:12px">
-        <div class="section-label" style="margin-top:0">Box ${i+1}</div>
-        <div class="field"><label>Label</label><input data-hl-field="label" data-hl-index="${i}" value="${esc(l.label)}" placeholder="e.g. New Arrivals"/></div>
-        <div class="field"><label>Image URL</label><input data-hl-field="image" data-hl-index="${i}" value="${esc(l.image)}" placeholder="https://..."/></div>
-        <div class="field"><label>Links to category</label>
-          <select data-hl-field="category" data-hl-index="${i}">
-            ${CATEGORIES.map(c=>`<option value="${c}" ${l.category===c?'selected':''}>${c}</option>`).join("")}
-          </select>
-        </div>
-      </div>
-    `).join("")}
-    <button class="primary-btn" data-act="savehomelinks">Save Home Page</button>
   </div>`;
 }
 
@@ -722,18 +656,6 @@ function handleAction(e){
     STATE.adminPass = v;
     setState({});
     flash("Passcode updated.");
-  }
-
-  else if(act==="savehomelinks"){
-    const links = (STATE.homeLinks || DEFAULT_HOME_LINKS).map((l,i)=>{
-      const label = document.querySelector(`[data-hl-field="label"][data-hl-index="${i}"]`).value.trim();
-      const image = document.querySelector(`[data-hl-field="image"][data-hl-index="${i}"]`).value.trim();
-      const category = document.querySelector(`[data-hl-field="category"][data-hl-index="${i}"]`).value;
-      return { label, image, category };
-    });
-    STATE.homeLinks = links;
-    setState({});
-    flash("Home page updated.");
   }
 }
 

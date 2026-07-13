@@ -1,0 +1,68 @@
+// netlify/functions/create-checkout.js
+// Creates a Stripe Checkout Session for the member's cart.
+// Runs server-side only — this is the one place the Stripe secret key is used.
+
+const Stripe = require("stripe");
+
+const SUPABASE_URL = "https://njlrcamdlghcvzkwpbff.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qbHJjYW1kbGdoY3Z6a3dwYmZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1Nzg5MjIsImV4cCI6MjA5OTE1NDkyMn0.ul4nyNg2Lbwl3LKJ2qW6ogOw_xkgNYRwuAApOHO8CKI";
+
+exports.handler = async (event) => {
+  if (event.httpMethod !== "POST") {
+    return { statusCode: 405, body: "Method not allowed" };
+  }
+
+  try {
+    const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
+    const { items, memberEmail, memberName, siteUrl } = JSON.parse(event.body);
+
+    if (!items || !items.length) {
+      return { statusCode: 400, body: JSON.stringify({ error: "Cart is empty." }) };
+    }
+
+    // Fetch the current product catalog from Supabase so prices/stock are verified
+    // server-side — never trust prices sent from the browser.
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/app_data?select=value&key=eq.pr_products`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+    );
+    const rows = await res.json();
+    const products = (rows[0] && rows[0].value) || [];
+
+    const line_items = [];
+    for (const item of items) {
+      const product = products.find((p) => p.id === item.id);
+      if (!product) return { statusCode: 400, body: JSON.stringify({ error: `Product ${item.id} not found.` }) };
+      if (product.stock < item.qty) {
+        return { statusCode: 400, body: JSON.stringify({ error: `Not enough stock for ${product.name}.` }) };
+      }
+      line_items.push({
+        quantity: item.qty,
+        price_data: {
+          currency: "usd",
+          unit_amount: Math.round(product.price * 100),
+          product_data: { name: product.name, description: product.category },
+        },
+      });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      line_items,
+      shipping_address_collection: { allowed_countries: ["US", "CA"] },
+      customer_email: memberEmail,
+      success_url: `${siteUrl}/?order_success=1&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${siteUrl}/?order_cancelled=1`,
+      metadata: {
+        memberEmail: memberEmail || "",
+        memberName: memberName || "",
+        cart: JSON.stringify(items),
+      },
+    });
+
+    return { statusCode: 200, body: JSON.stringify({ url: session.url }) };
+  } catch (err) {
+    console.error(err);
+    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+  }
+};
