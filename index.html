@@ -47,6 +47,8 @@
   .tab-btn.active{background:var(--border2);color:var(--text);}
   .field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px;}
   .field label{font-size:11px;color:var(--muted);letter-spacing:.3px;}
+  .img-preview{margin-top:2px;}
+  .img-preview img{max-width:140px;max-height:140px;border-radius:4px;display:block;object-fit:cover;}
   .primary-btn{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--gold);
     color:#1C1410;border:none;border-radius:4px;padding:13px 16px;font-size:14px;font-weight:600;
     width:100%;margin-top:6px;}
@@ -107,6 +109,8 @@
   .add-btn{background:var(--border2);border:none;color:var(--text);border-radius:4px;padding:8px;
     font-size:12px;width:100%;}
   .add-btn:disabled{opacity:.4;}
+  .add-btn-row{display:flex;flex-direction:column;gap:6px;}
+  .p-box-note{font-size:10px;color:var(--muted);font-weight:400;display:block;margin-top:2px;}
 
   .panel{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:18px;margin-top:4px;}
   .panel-title{font-size:18px;margin:4px 0 12px;}
@@ -167,7 +171,7 @@
 ============================================================ */
 
 const CATEGORIES = ["Cigars","Spirits","Accessories"];
-const CUBAN_BRANDS = ["Cohiba","Montecristo","Romeo y Julieta","Partagás","Bolívar","H. Upmann","Hoyo de Monterrey"];
+const CUBAN_BRANDS = ["Cohiba","Montecristo","Romeo y Julieta","Partagás","Bolívar","H. Upmann","Hoyo de Monterrey","Trinidad"];
 const SEED_PRODUCTS = [
   {id:"p1",name:"Vitola Oscuro No. 4",category:"Cigars",price:24,stock:40,description:"Full-bodied Nicaraguan puro, notes of espresso and dark cocoa.",image:""},
   {id:"p2",name:"Reserva Añejo Rum, 12yr",category:"Spirits",price:68,stock:18,description:"Small-batch rum aged in charred oak, caramel and orange peel finish.",image:""},
@@ -250,6 +254,46 @@ async function pullShared(showFlash){
 }
 
 const money = n => "$" + Number(n).toFixed(2);
+
+function imageField(hiddenId, currentValue, label){
+  return `
+    <div class="field">
+      <label>${esc(label)}</label>
+      <input type="file" accept="image/*" data-img-target="${hiddenId}"/>
+      <input type="hidden" id="${hiddenId}" value="${esc(currentValue||'')}"/>
+      <div class="img-preview" id="${hiddenId}-preview">${currentValue?`<img src="${esc(currentValue)}"/>`:""}</div>
+    </div>`;
+}
+
+function handleImageFile(e){
+  const file = e.target.files && e.target.files[0];
+  if(!file) return;
+  const targetId = e.target.dataset.imgTarget;
+  const preview = document.getElementById(targetId+"-preview");
+  if(preview) preview.innerHTML = `<span style="font-size:11px;color:var(--muted)">Processing photo…</span>`;
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    const img = new Image();
+    img.onload = function(){
+      const maxDim = 900;
+      let w = img.width, h = img.height;
+      if(w > maxDim || h > maxDim){
+        if(w >= h){ h = Math.round(h * maxDim / w); w = maxDim; }
+        else { w = Math.round(w * maxDim / h); h = maxDim; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.72);
+      const hidden = document.getElementById(targetId);
+      if(hidden) hidden.value = dataUrl;
+      if(preview) preview.innerHTML = `<img src="${dataUrl}"/>`;
+    };
+    img.onerror = function(){ if(preview) preview.innerHTML = `<span style="font-size:11px;color:var(--bad)">Couldn't read that photo.</span>`; };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
 const esc = s => String(s==null?"":s).replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 const genCode = () => Array.from({length:8},()=> "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random()*32)]).join("");
 const genId = p => p+"_"+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
@@ -364,24 +408,38 @@ function renderTopbar(title, subtitle, rightHtml){
 
 /* ---------- STORE ---------- */
 function cartItems(){
-  return Object.entries(STATE.cart).map(([id,qty])=>{
+  return Object.entries(STATE.cart).map(([key,qty])=>{
+    const idx = key.lastIndexOf("__");
+    const id = idx === -1 ? key : key.slice(0, idx);
+    const variant = idx === -1 ? "single" : key.slice(idx+2);
     const product = STATE.products.find(p=>p.id===id);
-    return product ? {product, qty} : null;
+    if(!product) return null;
+    const isBox = variant === "box";
+    const unitPrice = isBox ? Number(product.boxPrice)||0 : product.price;
+    const variantLabel = isBox ? (product.boxLabel || "Box") : null;
+    return { key, product, qty, variant, unitPrice, variantLabel };
   }).filter(Boolean);
 }
 function cartCount(){ return cartItems().reduce((s,c)=>s+c.qty,0); }
-function cartTotal(){ return cartItems().reduce((s,c)=>s+c.qty*c.product.price,0); }
+function cartTotal(){ return cartItems().reduce((s,c)=>s+c.qty*c.unitPrice,0); }
 
 function productCard(p){
+  const hasBox = p.boxPrice && p.boxPrice > 0;
+  const addBtns = hasBox
+    ? `<div class="add-btn-row">
+        <button class="add-btn" data-act="addcart" data-val="${p.id}" data-variant="single" ${p.stock===0?"disabled":""}>${p.stock===0?"Sold Out":`Single – ${money(p.price)}`}</button>
+        <button class="add-btn" data-act="addcart" data-val="${p.id}" data-variant="box" ${p.stock===0?"disabled":""}>${p.stock===0?"Sold Out":`${esc(p.boxLabel||"Box")} – ${money(p.boxPrice)}`}</button>
+      </div>`
+    : `<button class="add-btn" data-act="addcart" data-val="${p.id}" data-variant="single" ${p.stock===0?"disabled":""}>${p.stock===0?"Sold Out":"+ Add"}</button>`;
   return `
     <div class="p-card">
       <div class="p-img">${p.image?`<img src="${esc(p.image)}" style="width:100%;height:100%;object-fit:cover;border-radius:4px"/>`: (p.category==="Cigars"?"🚬":p.category==="Spirits"?"🥃":"📦")}</div>
       <div class="p-title">${esc(p.name)}</div>
       <div class="p-desc">${esc(p.description)}</div>
       <div class="p-foot">
-        <span class="p-price">${money(p.price)}</span>
+        <span class="p-price">${money(p.price)}${hasBox?` <span class="p-box-note">or ${money(p.boxPrice)} ${esc(p.boxLabel||"box")}</span>`:""}</span>
       </div>
-      <button class="add-btn" data-act="addcart" data-val="${p.id}" ${p.stock===0?"disabled":""}>${p.stock===0?"Sold Out":"+ Add"}</button>
+      ${addBtns}
     </div>`;
 }
 
@@ -513,13 +571,13 @@ function renderStore(){
       <h2 class="panel-title">Your Cart</h2>
       ${items.length===0? `<div class="empty">Your cart is empty.</div>` : items.map(c=>`
         <div class="cart-row">
-          <div><div class="cart-row-name">${esc(c.product.name)}</div><div class="cart-row-sub">${money(c.product.price)} each</div></div>
+          <div><div class="cart-row-name">${esc(c.product.name)}${c.variantLabel?` <span class="cart-row-sub">(${esc(c.variantLabel)})</span>`:""}</div><div class="cart-row-sub">${money(c.unitPrice)} each</div></div>
           <div class="qty-group">
-            <button class="qty-btn" data-act="qty" data-id="${c.product.id}" data-delta="-1">−</button>
+            <button class="qty-btn" data-act="qty" data-id="${c.key}" data-delta="-1">−</button>
             <span>${c.qty}</span>
-            <button class="qty-btn" data-act="qty" data-id="${c.product.id}" data-delta="1">+</button>
+            <button class="qty-btn" data-act="qty" data-id="${c.key}" data-delta="1">+</button>
           </div>
-          <div style="width:64px;text-align:right">${money(c.qty*c.product.price)}</div>
+          <div style="width:64px;text-align:right">${money(c.qty*c.unitPrice)}</div>
         </div>`).join("")}
       ${items.length>0? `
         <div class="total-row"><span>Total</span><span>${money(cartTotal())}</span></div>
@@ -575,10 +633,14 @@ function renderProductsAdmin(){
       </div>
     </div>
     <div class="row2">
-      <div class="field"><label>Price ($)</label><input id="pf-price" type="number" value="${f?f.price:''}"/></div>
+      <div class="field"><label>Single Price ($)</label><input id="pf-price" type="number" value="${f?f.price:''}"/></div>
       <div class="field"><label>Stock</label><input id="pf-stock" type="number" value="${f?f.stock:''}"/></div>
     </div>
-    <div class="field"><label>Image URL (optional)</label><input id="pf-img" value="${esc(f?f.image:'')}"/></div>
+    <div class="row2">
+      <div class="field"><label>Box Price ($, optional)</label><input id="pf-boxprice" type="number" value="${f&&f.boxPrice?f.boxPrice:''}" placeholder="Leave blank if no box option"/></div>
+      <div class="field"><label>Box Label (optional)</label><input id="pf-boxlabel" value="${esc(f?f.boxLabel||'':'')}" placeholder="e.g. Box of 25"/></div>
+    </div>
+    ${imageField("pf-img", f?f.image:"", "Photo")}
     <div class="field"><label>Description</label><textarea id="pf-desc" style="min-height:60px">${esc(f?f.description:'')}</textarea></div>
     <h3 class="section-label" style="margin-top:18px">Cigar Details (only used when Category is Cigars)</h3>
     <div class="row3">
@@ -623,7 +685,7 @@ function renderOrdersAdmin(){
           </select>
         </div>
         <div class="cart-row-sub">Ship to: ${esc(o.shipping.address)}, ${esc(o.shipping.city)}, ${esc(o.shipping.state)} ${esc(o.shipping.zip)} · card •••• ${esc(o.cardLast4)}</div>
-        <ul class="order-items">${o.items.map(it=>`<li>${it.qty} × ${esc(it.name)} — ${money(it.price*it.qty)}</li>`).join("")}</ul>
+        <ul class="order-items">${o.items.map(it=>`<li>${it.qty} × ${esc(it.name)}${it.variantLabel?` (${esc(it.variantLabel)})`:""} — ${money(it.price*it.qty)}</li>`).join("")}</ul>
       </div>
     `).join("")}
   </div>`;
@@ -671,7 +733,7 @@ function renderHomePageAdmin(){
       <div style="border:1px solid var(--border);border-radius:5px;padding:12px;margin-bottom:12px">
         <div class="section-label" style="margin-top:0">Box ${i+1}</div>
         <div class="field"><label>Label</label><input data-hl-field="label" data-hl-index="${i}" value="${esc(l.label)}" placeholder="e.g. New Arrivals"/></div>
-        <div class="field"><label>Image URL</label><input data-hl-field="image" data-hl-index="${i}" value="${esc(l.image)}" placeholder="https://..."/></div>
+        ${imageField(`hl-img-${i}`, l.image, "Photo")}
         <div class="field"><label>Links to category</label>
           <select data-hl-field="category" data-hl-index="${i}">
             ${CATEGORIES.map(c=>`<option value="${c}" ${l.category===c?'selected':''}>${c}</option>`).join("")}
@@ -688,8 +750,8 @@ function renderCigarBrandsAdmin(){
   return `<div class="panel">
     <h3 class="section-label">Cuban Cigar Brand Images</h3>
     <p class="cart-row-sub" style="margin-bottom:14px">Set the photo shown on each brand card under Cigars → Cuban Cigars. Tag your products with a matching Brand in the Products tab so they show up under the right one.</p>
-    ${CUBAN_BRANDS.map(b=>`
-      <div class="field"><label>${esc(b)}</label><input data-cb-brand="${esc(b)}" value="${esc(imgs[b]||'')}" placeholder="https://..."/></div>
+    ${CUBAN_BRANDS.map((b,i)=>`
+      <div data-cb-name="${esc(b)}">${imageField(`cb-img-${i}`, imgs[b], b)}</div>
     `).join("")}
     <button class="primary-btn" data-act="savecigarbrands">Save Brand Images</button>
   </div>`;
@@ -708,6 +770,9 @@ function renderSettingsAdmin(){
 function bindEvents(){
   document.querySelectorAll("[data-act]").forEach(el=>{
     el.addEventListener(el.tagName==="SELECT"?"change":"click", handleAction);
+  });
+  document.querySelectorAll('input[type="file"][data-img-target]').forEach(el=>{
+    el.addEventListener("change", handleImageFile);
   });
 }
 
@@ -775,8 +840,11 @@ function handleAction(e){
   else if(act==="addcart"){
     const p = STATE.products.find(pp=>pp.id===val);
     if(!p) return;
-    if((STATE.cart[val]||0) >= p.stock) return flash("No more in stock.","err");
-    STATE.cart[val] = (STATE.cart[val]||0)+1;
+    const variant = el.dataset.variant || "single";
+    const key = `${val}__${variant}`;
+    const totalInCart = (STATE.cart[`${val}__single`]||0) + (STATE.cart[`${val}__box`]||0);
+    if(totalInCart >= p.stock) return flash("No more in stock.","err");
+    STATE.cart[key] = (STATE.cart[key]||0)+1;
     render();
   }
   else if(act==="qty"){
@@ -794,7 +862,7 @@ function handleAction(e){
       method: "POST",
       headers: {"Content-Type":"application/json"},
       body: JSON.stringify({
-        items: items.map(c=>({id:c.product.id, qty:c.qty})),
+        items: items.map(c=>({id:c.product.id, variant:c.variant, qty:c.qty})),
         memberEmail: STATE.session.email,
         memberName: STATE.session.name,
         siteUrl: window.location.origin,
@@ -822,17 +890,21 @@ function handleAction(e){
     const category = document.getElementById("pf-cat").value;
     const price = parseFloat(document.getElementById("pf-price").value);
     const stock = parseInt(document.getElementById("pf-stock").value,10)||0;
+    const boxPriceRaw = document.getElementById("pf-boxprice").value.trim();
+    const boxPrice = boxPriceRaw ? parseFloat(boxPriceRaw) : null;
+    const boxLabel = document.getElementById("pf-boxlabel").value.trim();
     const image = document.getElementById("pf-img").value.trim();
     const description = document.getElementById("pf-desc").value.trim();
     const cigarOrigin = document.getElementById("pf-origin").value.trim();
     const cigarBrand = document.getElementById("pf-brand").value;
     const cigarLine = document.getElementById("pf-line").value.trim();
     if(!name || isNaN(price)) return flash("Name and price are required.","err");
+    if(boxPriceRaw && isNaN(boxPrice)) return flash("Box price must be a number.","err");
     if(val){
-      STATE.products = STATE.products.map(p=>p.id===val?{...p,name,category,price,stock,image,description,cigarOrigin,cigarBrand,cigarLine}:p);
+      STATE.products = STATE.products.map(p=>p.id===val?{...p,name,category,price,stock,boxPrice,boxLabel,image,description,cigarOrigin,cigarBrand,cigarLine}:p);
       flash("Product updated.");
     } else {
-      STATE.products = [{id:genId("prod"),name,category,price,stock,image,description,cigarOrigin,cigarBrand,cigarLine}, ...STATE.products];
+      STATE.products = [{id:genId("prod"),name,category,price,stock,boxPrice,boxLabel,image,description,cigarOrigin,cigarBrand,cigarLine}, ...STATE.products];
       flash("Product added.");
     }
     STATE.productForm = null;
@@ -872,7 +944,7 @@ function handleAction(e){
   else if(act==="savehomelinks"){
     const links = (STATE.homeLinks || DEFAULT_HOME_LINKS).map((l,i)=>{
       const label = document.querySelector(`[data-hl-field="label"][data-hl-index="${i}"]`).value.trim();
-      const image = document.querySelector(`[data-hl-field="image"][data-hl-index="${i}"]`).value.trim();
+      const image = document.getElementById(`hl-img-${i}`).value.trim();
       const category = document.querySelector(`[data-hl-field="category"][data-hl-index="${i}"]`).value;
       return { label, image, category };
     });
@@ -883,8 +955,8 @@ function handleAction(e){
 
   else if(act==="savecigarbrands"){
     const imgs = {};
-    CUBAN_BRANDS.forEach(b=>{
-      const v = document.querySelector(`[data-cb-brand="${b}"]`).value.trim();
+    CUBAN_BRANDS.forEach((b,i)=>{
+      const v = document.getElementById(`cb-img-${i}`).value.trim();
       if(v) imgs[b] = v;
     });
     STATE.cigarBrandImages = imgs;
