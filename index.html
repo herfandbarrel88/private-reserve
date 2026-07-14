@@ -86,6 +86,12 @@
   .home-footer{text-align:center;font-size:12px;color:var(--muted);margin-top:26px;padding-top:16px;
     border-top:1px solid var(--border);}
 
+  .breadcrumb{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
+  .crumb-row{display:flex;flex-wrap:wrap;align-items:center;gap:4px;font-size:12px;}
+  .crumb-btn{background:none;border:none;color:var(--gold);padding:2px 0;font-size:12px;}
+  .crumb-sep{color:var(--muted2);}
+  .crumb-current{color:var(--muted);}
+
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
   .p-card{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:6px;
     padding:13px;display:flex;flex-direction:column;}
@@ -161,6 +167,7 @@
 ============================================================ */
 
 const CATEGORIES = ["Cigars","Spirits","Accessories"];
+const CUBAN_BRANDS = ["Cohiba","Montecristo","Romeo y Julieta","Partagás","Bolívar","H. Upmann","Hoyo de Monterrey"];
 const SEED_PRODUCTS = [
   {id:"p1",name:"Vitola Oscuro No. 4",category:"Cigars",price:24,stock:40,description:"Full-bodied Nicaraguan puro, notes of espresso and dark cocoa.",image:""},
   {id:"p2",name:"Reserva Añejo Rum, 12yr",category:"Spirits",price:68,stock:18,description:"Small-batch rum aged in charred oak, caramel and orange peel finish.",image:""},
@@ -172,7 +179,7 @@ const SEED_PRODUCTS = [
 
 const SUPABASE_URL = "https://njlrcamdlghcvzkwpbff.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qbHJjYW1kbGdoY3Z6a3dwYmZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1Nzg5MjIsImV4cCI6MjA5OTE1NDkyMn0.ul4nyNg2Lbwl3LKJ2qW6ogOw_xkgNYRwuAApOHO8CKI";
-const SHARED_KEYS = ["pr_products","pr_members","pr_invites","pr_orders","pr_admin_pass","pr_home_links"];
+const SHARED_KEYS = ["pr_products","pr_members","pr_invites","pr_orders","pr_admin_pass","pr_home_links","pr_cigar_brand_images"];
 
 function sbHeaders(extra){
   return Object.assign({
@@ -208,10 +215,12 @@ async function pushShared(){
       sbUpsert("pr_orders", STATE.orders),
       sbUpsert("pr_admin_pass", STATE.adminPass),
       sbUpsert("pr_home_links", STATE.homeLinks),
+      sbUpsert("pr_cigar_brand_images", STATE.cigarBrandImages),
     ]);
     dbSet("pr_products", STATE.products); dbSet("pr_members", STATE.members);
     dbSet("pr_invites", STATE.invites); dbSet("pr_orders", STATE.orders);
     dbSet("pr_admin_pass", STATE.adminPass); dbSet("pr_home_links", STATE.homeLinks);
+    dbSet("pr_cigar_brand_images", STATE.cigarBrandImages);
   }catch(e){
     console.error("sync failed", e);
     flash("Couldn't sync to the server — changes saved on this device only for now.", "err");
@@ -226,9 +235,11 @@ async function pullShared(showFlash){
     if(remote.pr_orders) STATE.orders = remote.pr_orders;
     if(remote.pr_admin_pass) STATE.adminPass = remote.pr_admin_pass;
     if(remote.pr_home_links) STATE.homeLinks = remote.pr_home_links;
+    if(remote.pr_cigar_brand_images) STATE.cigarBrandImages = remote.pr_cigar_brand_images;
     dbSet("pr_products", STATE.products); dbSet("pr_members", STATE.members);
     dbSet("pr_invites", STATE.invites); dbSet("pr_orders", STATE.orders);
     dbSet("pr_admin_pass", STATE.adminPass); dbSet("pr_home_links", STATE.homeLinks);
+    dbSet("pr_cigar_brand_images", STATE.cigarBrandImages);
     if(showFlash) flash("Refreshed.");
     return true;
   }catch(e){
@@ -263,6 +274,8 @@ let STATE = {
   orders: dbGet("pr_orders", []),
   adminPass: dbGet("pr_admin_pass", "humidor21"),
   homeLinks: dbGet("pr_home_links", null) || DEFAULT_HOME_LINKS,
+  cigarBrandImages: dbGet("pr_cigar_brand_images", {}),
+  cigarNav: { level: "root", brand: null, line: null },
   session: dbGet("pr_session", null),
   gateTab: "signin",
   storeScreen: "shop",
@@ -359,6 +372,106 @@ function cartItems(){
 function cartCount(){ return cartItems().reduce((s,c)=>s+c.qty,0); }
 function cartTotal(){ return cartItems().reduce((s,c)=>s+c.qty*c.product.price,0); }
 
+function productCard(p){
+  return `
+    <div class="p-card">
+      <div class="p-img">${p.image?`<img src="${esc(p.image)}" style="width:100%;height:100%;object-fit:cover;border-radius:4px"/>`: (p.category==="Cigars"?"🚬":p.category==="Spirits"?"🥃":"📦")}</div>
+      <div class="p-title">${esc(p.name)}</div>
+      <div class="p-desc">${esc(p.description)}</div>
+      <div class="p-foot">
+        <span class="p-price">${money(p.price)}</span>
+      </div>
+      <button class="add-btn" data-act="addcart" data-val="${p.id}" ${p.stock===0?"disabled":""}>${p.stock===0?"Sold Out":"+ Add"}</button>
+    </div>`;
+}
+
+function cigarBreadcrumb(){
+  const nav = STATE.cigarNav;
+  const parts = [];
+  parts.push(`<button class="crumb-btn" data-act="cigarnav" data-val="root">Cigars</button>`);
+  if(nav.level==="cuban"||nav.level==="brand"||nav.level==="products"){
+    parts.push(`<button class="crumb-btn" data-act="cigarnav" data-val="cuban">Cuban Cigars</button>`);
+  }
+  if(nav.level==="brand"||nav.level==="products"){
+    parts.push(`<button class="crumb-btn" data-act="cigarnav" data-val="brand" data-brand="${esc(nav.brand)}">${esc(nav.brand)}</button>`);
+  }
+  if(nav.level==="products"){
+    parts.push(`<span class="crumb-current">${esc(nav.line)}</span>`);
+  }
+  return `<div class="breadcrumb">
+    <button class="back-link" data-act="cigarback">← Back</button>
+    <div class="crumb-row">${parts.join('<span class="crumb-sep">›</span>')}</div>
+  </div>`;
+}
+
+function renderCigarsPage(){
+  const nav = STATE.cigarNav;
+  const cigars = STATE.products.filter(p=>p.category==="Cigars");
+
+  if(nav.level === "root"){
+    const nonCuban = cigars.filter(p=>(p.cigarOrigin||"").trim().toLowerCase() !== "cuban");
+    return `
+      <div class="cat-row">
+        ${["Home",...CATEGORIES].map(c=>`<button class="cat-btn ${STATE.category===c?'active':''}" data-act="setcat" data-val="${c}">${esc(c)}</button>`).join("")}
+      </div>
+      <div class="cat-row">
+        <button class="cat-btn" data-act="cigarnav" data-val="cuban">Cuban Cigars</button>
+      </div>
+      <div class="grid">
+        ${nonCuban.map(p=>productCard(p)).join("") || `<div class="empty" style="grid-column:1/-1">No other cigars listed yet.</div>`}
+      </div>`;
+  }
+
+  if(nav.level === "cuban"){
+    return `
+      <div class="cat-row">
+        ${["Home",...CATEGORIES].map(c=>`<button class="cat-btn ${STATE.category===c?'active':''}" data-act="setcat" data-val="${c}">${esc(c)}</button>`).join("")}
+      </div>
+      ${cigarBreadcrumb()}
+      <div class="home-links-grid">
+        ${CUBAN_BRANDS.map(b=>{
+          const img = (STATE.cigarBrandImages||{})[b] || "";
+          return `<button class="home-link-box" data-act="cigarnav" data-val="brand" data-brand="${esc(b)}">
+            <div class="home-link-img">${img?`<img src="${esc(img)}" style="width:100%;height:100%;object-fit:cover;border-radius:4px"/>`:`<span class="p-img-fallback">🚬</span>`}</div>
+            <div class="home-link-label">${esc(b)}</div>
+          </button>`;
+        }).join("")}
+      </div>`;
+  }
+
+  if(nav.level === "brand"){
+    const brandCigars = cigars.filter(p=>(p.cigarOrigin||"").trim().toLowerCase()==="cuban" && p.cigarBrand===nav.brand);
+    const lines = [...new Set(brandCigars.map(p=>p.cigarLine).filter(Boolean))];
+    return `
+      <div class="cat-row">
+        ${["Home",...CATEGORIES].map(c=>`<button class="cat-btn ${STATE.category===c?'active':''}" data-act="setcat" data-val="${c}">${esc(c)}</button>`).join("")}
+      </div>
+      ${cigarBreadcrumb()}
+      <div class="home-links-grid">
+        ${lines.map(line=>{
+          const sample = brandCigars.find(p=>p.cigarLine===line);
+          return `<button class="home-link-box" data-act="cigarnav" data-val="line" data-line="${esc(line)}">
+            <div class="home-link-img">${sample&&sample.image?`<img src="${esc(sample.image)}" style="width:100%;height:100%;object-fit:cover;border-radius:4px"/>`:`<span class="p-img-fallback">🚬</span>`}</div>
+            <div class="home-link-label">${esc(line)}</div>
+          </button>`;
+        }).join("") || `<div class="empty" style="grid-column:1/-1">No lines added for ${esc(nav.brand)} yet — add products in the Back Office and tag them with this brand.</div>`}
+      </div>`;
+  }
+
+  if(nav.level === "products"){
+    const lineCigars = cigars.filter(p=>(p.cigarOrigin||"").trim().toLowerCase()==="cuban" && p.cigarBrand===nav.brand && p.cigarLine===nav.line);
+    return `
+      <div class="cat-row">
+        ${["Home",...CATEGORIES].map(c=>`<button class="cat-btn ${STATE.category===c?'active':''}" data-act="setcat" data-val="${c}">${esc(c)}</button>`).join("")}
+      </div>
+      ${cigarBreadcrumb()}
+      <div class="grid">
+        ${lineCigars.map(p=>productCard(p)).join("") || `<div class="empty" style="grid-column:1/-1">No products in this line yet.</div>`}
+      </div>`;
+  }
+  return "";
+}
+
 function renderStore(){
   const right = `<button class="icon-btn" data-act="refresh" title="Refresh">⟳</button>
     <button class="cart-btn" data-act="gostore" data-val="cart">🛍 ${cartCount()}</button>
@@ -381,6 +494,8 @@ function renderStore(){
       </div>
       <div class="home-footer">Cigar Brothers — Contact us 0414790053</div>
       `;
+    } else if(STATE.category === "Cigars"){
+      body = renderCigarsPage();
     } else {
       const visible = STATE.products.filter(p=>p.category===STATE.category);
       body = `
@@ -388,19 +503,7 @@ function renderStore(){
         ${["Home",...CATEGORIES].map(c=>`<button class="cat-btn ${STATE.category===c?'active':''}" data-act="setcat" data-val="${c}">${esc(c)}</button>`).join("")}
       </div>
       <div class="grid">
-        ${visible.map(p=>`
-          <div class="p-card">
-            <div class="p-badge">${esc(p.category)}</div>
-            <div class="p-img">${p.image?`<img src="${esc(p.image)}" style="width:100%;height:100%;object-fit:cover;border-radius:4px"/>`: (p.category==="Cigars"?"🚬":p.category==="Spirits"?"🥃":"📦")}</div>
-            <div class="p-title">${esc(p.name)}</div>
-            <div class="p-desc">${esc(p.description)}</div>
-            <div class="p-foot">
-              <span class="p-price">${money(p.price)}</span>
-              <span class="p-stock" style="${p.stock===0?'color:var(--bad)':''}">${p.stock===0?"Out of stock":p.stock+" in stock"}</span>
-            </div>
-            <button class="add-btn" data-act="addcart" data-val="${p.id}" ${p.stock===0?"disabled":""}>+ Add</button>
-          </div>
-        `).join("") || `<div class="empty" style="grid-column:1/-1">Nothing in this category yet.</div>`}
+        ${visible.map(p=>productCard(p)).join("") || `<div class="empty" style="grid-column:1/-1">Nothing in this category yet.</div>`}
       </div>`;
     }
   } else if(STATE.storeScreen === "cart"){
@@ -445,7 +548,7 @@ function s_name(){ return STATE.session && STATE.session.name ? STATE.session.na
 
 /* ---------- ADMIN ---------- */
 function renderAdmin(){
-  const tabs = [["products","Products"],["orders","Orders"],["members","Members"],["invites","Invite Codes"],["homepage","Home Page"],["settings","Settings"]];
+  const tabs = [["products","Products"],["orders","Orders"],["members","Members"],["invites","Invite Codes"],["homepage","Home Page"],["cigarbrands","Cigar Brands"],["settings","Settings"]];
   const right = `<button class="icon-btn" data-act="refresh" title="Refresh">⟳</button>
     <button class="icon-btn" data-act="logout">⏻</button>`;
   const tabRow = `<div class="admin-tabs">${tabs.map(([k,l])=>`<button class="admin-tab ${STATE.adminTab===k?'active':''}" data-act="admintab" data-val="${k}">${l}</button>`).join("")}</div>`;
@@ -455,6 +558,7 @@ function renderAdmin(){
   else if(STATE.adminTab==="members") body = renderMembersAdmin();
   else if(STATE.adminTab==="invites") body = renderInvitesAdmin();
   else if(STATE.adminTab==="homepage") body = renderHomePageAdmin();
+  else if(STATE.adminTab==="cigarbrands") body = renderCigarBrandsAdmin();
   else if(STATE.adminTab==="settings") body = renderSettingsAdmin();
   return renderTopbar("Back Office", "Private Reserve — Proprietor View", right) + tabRow + `<div class="content">${body}</div>`;
 }
@@ -476,6 +580,17 @@ function renderProductsAdmin(){
     </div>
     <div class="field"><label>Image URL (optional)</label><input id="pf-img" value="${esc(f?f.image:'')}"/></div>
     <div class="field"><label>Description</label><textarea id="pf-desc" style="min-height:60px">${esc(f?f.description:'')}</textarea></div>
+    <h3 class="section-label" style="margin-top:18px">Cigar Details (only used when Category is Cigars)</h3>
+    <div class="row3">
+      <div class="field"><label>Origin</label><input id="pf-origin" value="${esc(f?f.cigarOrigin||'':'')}" placeholder="e.g. Cuban"/></div>
+      <div class="field"><label>Brand</label>
+        <select id="pf-brand">
+          <option value="">— none —</option>
+          ${CUBAN_BRANDS.map(b=>`<option value="${b}" ${f&&f.cigarBrand===b?'selected':''}>${b}</option>`).join("")}
+        </select>
+      </div>
+      <div class="field"><label>Line / Collection</label><input id="pf-line" value="${esc(f?f.cigarLine||'':'')}" placeholder="e.g. Siglo VI"/></div>
+    </div>
     <div style="display:flex;gap:10px">
       <button class="primary-btn" data-act="saveproduct" data-val="${editing||''}">${f?"Save Changes":"Add Product"}</button>
       ${f?`<button class="ghost-btn" data-act="canceledit">Cancel</button>`:""}
@@ -483,7 +598,7 @@ function renderProductsAdmin(){
     <h3 class="section-label" style="margin-top:26px">Catalog (${STATE.products.length})</h3>
     ${STATE.products.map(p=>`
       <div class="table-row">
-        <div class="flex2"><div class="cart-row-name">${esc(p.name)}</div><div class="cart-row-sub">${esc(p.category)}</div></div>
+        <div class="flex2"><div class="cart-row-name">${esc(p.name)}</div><div class="cart-row-sub">${esc(p.category)}${p.cigarBrand?" · "+esc(p.cigarBrand):""}${p.cigarLine?" · "+esc(p.cigarLine):""}</div></div>
         <div class="flex1">${money(p.price)}</div>
         <div class="flex1" style="${p.stock===0?'color:var(--bad)':''}">${p.stock} in stock</div>
         <button class="sm-btn" data-act="editproduct" data-val="${p.id}">Edit</button>
@@ -568,6 +683,18 @@ function renderHomePageAdmin(){
   </div>`;
 }
 
+function renderCigarBrandsAdmin(){
+  const imgs = STATE.cigarBrandImages || {};
+  return `<div class="panel">
+    <h3 class="section-label">Cuban Cigar Brand Images</h3>
+    <p class="cart-row-sub" style="margin-bottom:14px">Set the photo shown on each brand card under Cigars → Cuban Cigars. Tag your products with a matching Brand in the Products tab so they show up under the right one.</p>
+    ${CUBAN_BRANDS.map(b=>`
+      <div class="field"><label>${esc(b)}</label><input data-cb-brand="${esc(b)}" value="${esc(imgs[b]||'')}" placeholder="https://..."/></div>
+    `).join("")}
+    <button class="primary-btn" data-act="savecigarbrands">Save Brand Images</button>
+  </div>`;
+}
+
 function renderSettingsAdmin(){
   return `<div class="panel">
     <h3 class="section-label">Proprietor Passcode</h3>
@@ -628,7 +755,22 @@ function handleAction(e){
   else if(act==="refresh"){ pullShared(true).then(()=>render()); }
 
   else if(act==="gostore"){ STATE.storeScreen = val; render(); }
-  else if(act==="setcat"){ STATE.category = val; render(); }
+  else if(act==="setcat"){ STATE.category = val; STATE.cigarNav = { level: "root", brand: null, line: null }; render(); }
+
+  else if(act==="cigarnav"){
+    if(val==="root") STATE.cigarNav = { level: "root", brand: null, line: null };
+    else if(val==="cuban") STATE.cigarNav = { level: "cuban", brand: null, line: null };
+    else if(val==="brand") STATE.cigarNav = { level: "brand", brand: el.dataset.brand, line: null };
+    else if(val==="line") STATE.cigarNav = { level: "products", brand: STATE.cigarNav.brand, line: el.dataset.line };
+    render();
+  }
+  else if(act==="cigarback"){
+    const nav = STATE.cigarNav;
+    if(nav.level==="products") STATE.cigarNav = { level: "brand", brand: nav.brand, line: null };
+    else if(nav.level==="brand") STATE.cigarNav = { level: "cuban", brand: null, line: null };
+    else STATE.cigarNav = { level: "root", brand: null, line: null };
+    render();
+  }
 
   else if(act==="addcart"){
     const p = STATE.products.find(pp=>pp.id===val);
@@ -682,12 +824,15 @@ function handleAction(e){
     const stock = parseInt(document.getElementById("pf-stock").value,10)||0;
     const image = document.getElementById("pf-img").value.trim();
     const description = document.getElementById("pf-desc").value.trim();
+    const cigarOrigin = document.getElementById("pf-origin").value.trim();
+    const cigarBrand = document.getElementById("pf-brand").value;
+    const cigarLine = document.getElementById("pf-line").value.trim();
     if(!name || isNaN(price)) return flash("Name and price are required.","err");
     if(val){
-      STATE.products = STATE.products.map(p=>p.id===val?{...p,name,category,price,stock,image,description}:p);
+      STATE.products = STATE.products.map(p=>p.id===val?{...p,name,category,price,stock,image,description,cigarOrigin,cigarBrand,cigarLine}:p);
       flash("Product updated.");
     } else {
-      STATE.products = [{id:genId("prod"),name,category,price,stock,image,description}, ...STATE.products];
+      STATE.products = [{id:genId("prod"),name,category,price,stock,image,description,cigarOrigin,cigarBrand,cigarLine}, ...STATE.products];
       flash("Product added.");
     }
     STATE.productForm = null;
@@ -734,6 +879,17 @@ function handleAction(e){
     STATE.homeLinks = links;
     setState({});
     flash("Home page updated.");
+  }
+
+  else if(act==="savecigarbrands"){
+    const imgs = {};
+    CUBAN_BRANDS.forEach(b=>{
+      const v = document.querySelector(`[data-cb-brand="${b}"]`).value.trim();
+      if(v) imgs[b] = v;
+    });
+    STATE.cigarBrandImages = imgs;
+    setState({});
+    flash("Brand images updated.");
   }
 }
 
