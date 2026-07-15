@@ -1,8 +1,8 @@
 {
-  "name": "The Private Reserve",
-  "short_name": "Private Reserve",
-  "description": "Members-only cigars, spirits & accessories",
-  "start_url": "./index.html",
+  "name": "Private Reserve — Admin",
+  "short_name": "PR Admin",
+  "description": "Back office for The Private Reserve",
+  "start_url": "./admin.html",
   "display": "standalone",
   "background_color": "#161310",
   "theme_color": "#161310",
