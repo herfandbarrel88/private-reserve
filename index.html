@@ -568,12 +568,15 @@ function renderStore(){
         ${["Home",...CATEGORIES].map(c=>`<button class="cat-btn ${STATE.category===c?'active':''}" data-act="setcat" data-val="${c}">${esc(c)}</button>`).join("")}
       </div>
       <div class="home-links-grid">
-        ${links.map((l,i)=>`
-          <button class="home-link-box" data-act="setcat" data-val="${esc(l.category)}">
+        ${links.map((l,i)=>{
+          const target = l.target || (l.category ? `category:${l.category}` : "");
+          const fallbackLabel = target.startsWith("category:") ? target.slice(9) : (l.label || "Shop");
+          return `
+          <button class="home-link-box" data-act="homelinkgo" data-target="${esc(target)}">
             <div class="home-link-img">${l.image?`<img src="${esc(l.image)}" style="width:100%;height:100%;object-fit:cover;border-radius:4px"/>`:`<span class="p-img-fallback">+</span>`}</div>
-            <div class="home-link-label">${esc(l.label || l.category)}</div>
-          </button>
-        `).join("")}
+            <div class="home-link-label">${esc(l.label || fallbackLabel)}</div>
+          </button>`;
+        }).join("")}
       </div>
       <div class="home-footer">Cigar Brothers — Contact us 0414790053</div>
       `;
@@ -755,23 +758,86 @@ function renderInvitesAdmin(){
   </div>`;
 }
 
+function buildHomeLinkOptions(selectedTarget){
+  let html = `<option value="">— not linked yet —</option>`;
+  html += `<optgroup label="Category">` + CATEGORIES.map(c=>{
+    const v = `category:${c}`;
+    return `<option value="${esc(v)}" ${selectedTarget===v?'selected':''}>${esc(c)}</option>`;
+  }).join("") + `</optgroup>`;
+  html += `<optgroup label="Cigar Origin">` + Object.entries(STATE.cigarOrigins).map(([k,o])=>{
+    const v = `origin:${k}`;
+    return `<option value="${esc(v)}" ${selectedTarget===v?'selected':''}>${esc(o.label)}</option>`;
+  }).join("") + `</optgroup>`;
+  Object.entries(STATE.cigarOrigins).forEach(([k,o])=>{
+    if(o.brands.length){
+      html += `<optgroup label="${esc(o.label)} — Brand">` + o.brands.map(b=>{
+        const v = `brand:${k}:${b}`;
+        return `<option value="${esc(v)}" ${selectedTarget===v?'selected':''}>${esc(b)}</option>`;
+      }).join("") + `</optgroup>`;
+    }
+  });
+  if(STATE.products.length){
+    html += `<optgroup label="Specific Product">` + STATE.products.map(p=>{
+      const v = `product:${p.id}`;
+      return `<option value="${esc(v)}" ${selectedTarget===v?'selected':''}>${esc(p.name)}</option>`;
+    }).join("") + `</optgroup>`;
+  }
+  return html;
+}
+
+// Resolves a home-link target string into the store navigation state it should land on.
+function resolveHomeLinkTarget(target){
+  if(!target) return;
+  const [type, a, b] = target.split(":");
+  if(type === "category"){
+    STATE.category = a;
+    STATE.cigarNav = { level: "root", originKey: null, brand: null, line: null };
+  } else if(type === "origin"){
+    STATE.category = "Cigars";
+    STATE.cigarNav = { level: "origin", originKey: a, brand: null, line: null };
+  } else if(type === "brand"){
+    const origin = STATE.cigarOrigins[a];
+    STATE.category = "Cigars";
+    STATE.cigarNav = origin && origin.hasLines
+      ? { level: "brand", originKey: a, brand: b, line: null }
+      : { level: "products", originKey: a, brand: b, line: null };
+  } else if(type === "product"){
+    const p = STATE.products.find(pp=>pp.id===a);
+    if(!p) return;
+    STATE.category = p.category;
+    if(p.category === "Cigars"){
+      const originEntry = Object.entries(STATE.cigarOrigins).find(([,o])=>o.key.toLowerCase()===(p.cigarOrigin||"").trim().toLowerCase());
+      if(originEntry && p.cigarBrand){
+        const [originDictKey, origin] = originEntry;
+        STATE.cigarNav = origin.hasLines
+          ? { level: "brand", originKey: originDictKey, brand: p.cigarBrand, line: null }
+          : { level: "products", originKey: originDictKey, brand: p.cigarBrand, line: p.cigarLine || null };
+      } else {
+        STATE.cigarNav = { level: "root", originKey: null, brand: null, line: null };
+      }
+    } else {
+      STATE.cigarNav = { level: "root", originKey: null, brand: null, line: null };
+    }
+  }
+}
+
 function renderHomePageAdmin(){
   const links = STATE.homeLinks || DEFAULT_HOME_LINKS;
   return `<div class="panel">
     <h3 class="section-label">Home Page Link Boxes</h3>
-    <p class="cart-row-sub" style="margin-bottom:14px">These 5 boxes are what members see on the Home tab. Each one links to a category — tap it to browse those products. Add an image URL, a label, and pick which category it opens.</p>
-    ${links.map((l,i)=>`
+    <p class="cart-row-sub" style="margin-bottom:14px">These boxes are what members see on the Home tab. Link each one to a category, a cigar origin, a specific brand, or one individual product.</p>
+    ${links.map((l,i)=>{
+      const selectedTarget = l.target || (l.category ? `category:${l.category}` : "");
+      return `
       <div style="border:1px solid var(--border);border-radius:5px;padding:12px;margin-bottom:12px">
         <div class="section-label" style="margin-top:0">Box ${i+1}</div>
         <div class="field"><label>Label</label><input data-hl-field="label" data-hl-index="${i}" value="${esc(l.label)}" placeholder="e.g. New Arrivals"/></div>
         ${imageField(`hl-img-${i}`, l.image, "Photo")}
-        <div class="field"><label>Links to category</label>
-          <select data-hl-field="category" data-hl-index="${i}">
-            ${CATEGORIES.map(c=>`<option value="${c}" ${l.category===c?'selected':''}>${c}</option>`).join("")}
-          </select>
+        <div class="field"><label>Links to</label>
+          <select data-hl-field="target" data-hl-index="${i}">${buildHomeLinkOptions(selectedTarget)}</select>
         </div>
-      </div>
-    `).join("")}
+      </div>`;
+    }).join("")}
     <button class="primary-btn" data-act="savehomelinks">Save Home Page</button>
   </div>`;
 }
@@ -887,6 +953,7 @@ function handleAction(e){
 
   else if(act==="gostore"){ STATE.storeScreen = val; render(); }
   else if(act==="setcat"){ STATE.category = val; STATE.cigarNav = { level: "root", originKey: null, brand: null, line: null }; render(); }
+  else if(act==="homelinkgo"){ resolveHomeLinkTarget(el.dataset.target); render(); }
 
   else if(act==="cigarnav"){
     const nav = STATE.cigarNav;
@@ -1026,8 +1093,8 @@ function handleAction(e){
     const links = (STATE.homeLinks || DEFAULT_HOME_LINKS).map((l,i)=>{
       const label = document.querySelector(`[data-hl-field="label"][data-hl-index="${i}"]`).value.trim();
       const image = document.getElementById(`hl-img-${i}`).value.trim();
-      const category = document.querySelector(`[data-hl-field="category"][data-hl-index="${i}"]`).value;
-      return { label, image, category };
+      const target = document.querySelector(`[data-hl-field="target"][data-hl-index="${i}"]`).value;
+      return { label, image, target };
     });
     STATE.homeLinks = links;
     setState({});
