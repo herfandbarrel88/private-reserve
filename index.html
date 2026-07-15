@@ -171,7 +171,7 @@
 ============================================================ */
 
 const CATEGORIES = ["Cigars","Spirits","Accessories"];
-const CIGAR_ORIGINS = {
+const DEFAULT_CIGAR_ORIGINS = {
   cuban: {
     key: "Cuban", label: "Cuban Cigars",
     brands: ["Cohiba","Montecristo","Romeo y Julieta","Partagás","Bolívar","H. Upmann","Hoyo de Monterrey","Trinidad"],
@@ -194,7 +194,7 @@ const SEED_PRODUCTS = [
 
 const SUPABASE_URL = "https://njlrcamdlghcvzkwpbff.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qbHJjYW1kbGdoY3Z6a3dwYmZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1Nzg5MjIsImV4cCI6MjA5OTE1NDkyMn0.ul4nyNg2Lbwl3LKJ2qW6ogOw_xkgNYRwuAApOHO8CKI";
-const SHARED_KEYS = ["pr_products","pr_members","pr_invites","pr_orders","pr_admin_pass","pr_home_links","pr_cigar_brand_images"];
+const SHARED_KEYS = ["pr_products","pr_members","pr_invites","pr_orders","pr_admin_pass","pr_home_links","pr_cigar_brand_images","pr_cigar_origins"];
 
 function sbHeaders(extra){
   return Object.assign({
@@ -231,11 +231,12 @@ async function pushShared(){
       sbUpsert("pr_admin_pass", STATE.adminPass),
       sbUpsert("pr_home_links", STATE.homeLinks),
       sbUpsert("pr_cigar_brand_images", STATE.cigarBrandImages),
+      sbUpsert("pr_cigar_origins", STATE.cigarOrigins),
     ]);
     dbSet("pr_products", STATE.products); dbSet("pr_members", STATE.members);
     dbSet("pr_invites", STATE.invites); dbSet("pr_orders", STATE.orders);
     dbSet("pr_admin_pass", STATE.adminPass); dbSet("pr_home_links", STATE.homeLinks);
-    dbSet("pr_cigar_brand_images", STATE.cigarBrandImages);
+    dbSet("pr_cigar_brand_images", STATE.cigarBrandImages); dbSet("pr_cigar_origins", STATE.cigarOrigins);
   }catch(e){
     console.error("sync failed", e);
     flash("Couldn't sync to the server — changes saved on this device only for now.", "err");
@@ -251,10 +252,11 @@ async function pullShared(showFlash){
     if(remote.pr_admin_pass) STATE.adminPass = remote.pr_admin_pass;
     if(remote.pr_home_links) STATE.homeLinks = remote.pr_home_links;
     if(remote.pr_cigar_brand_images) STATE.cigarBrandImages = remote.pr_cigar_brand_images;
+    if(remote.pr_cigar_origins) STATE.cigarOrigins = remote.pr_cigar_origins;
     dbSet("pr_products", STATE.products); dbSet("pr_members", STATE.members);
     dbSet("pr_invites", STATE.invites); dbSet("pr_orders", STATE.orders);
     dbSet("pr_admin_pass", STATE.adminPass); dbSet("pr_home_links", STATE.homeLinks);
-    dbSet("pr_cigar_brand_images", STATE.cigarBrandImages);
+    dbSet("pr_cigar_brand_images", STATE.cigarBrandImages); dbSet("pr_cigar_origins", STATE.cigarOrigins);
     if(showFlash) flash("Refreshed.");
     return true;
   }catch(e){
@@ -330,6 +332,7 @@ let STATE = {
   adminPass: dbGet("pr_admin_pass", "humidor21"),
   homeLinks: dbGet("pr_home_links", null) || DEFAULT_HOME_LINKS,
   cigarBrandImages: dbGet("pr_cigar_brand_images", {}),
+  cigarOrigins: dbGet("pr_cigar_origins", null) || JSON.parse(JSON.stringify(DEFAULT_CIGAR_ORIGINS)),
   cigarNav: { level: "root", originKey: null, brand: null, line: null },
   session: dbGet("pr_session", null),
   gateTab: "signin",
@@ -343,6 +346,7 @@ let STATE = {
 };
 if(!dbGet("pr_products", null)) dbSet("pr_products", SEED_PRODUCTS);
 if(!dbGet("pr_home_links", null)) dbSet("pr_home_links", DEFAULT_HOME_LINKS);
+if(!dbGet("pr_cigar_origins", null)) dbSet("pr_cigar_origins", STATE.cigarOrigins);
 
 function persist(){
   dbSet("pr_session", STATE.session); // session stays local to this device on purpose
@@ -456,7 +460,7 @@ function productCard(p){
 
 function cigarBreadcrumb(){
   const nav = STATE.cigarNav;
-  const origin = nav.originKey ? CIGAR_ORIGINS[nav.originKey] : null;
+  const origin = nav.originKey ? STATE.cigarOrigins[nav.originKey] : null;
   const parts = [];
   parts.push(`<button class="crumb-btn" data-act="cigarnav" data-val="root">Cigars</button>`);
   if(origin){
@@ -483,22 +487,22 @@ function cigarCatRow(){
 function renderCigarsPage(){
   const nav = STATE.cigarNav;
   const cigars = STATE.products.filter(p=>p.category==="Cigars");
-  const originKeys = Object.keys(CIGAR_ORIGINS);
+  const originKeys = Object.keys(STATE.cigarOrigins);
 
   if(nav.level === "root"){
-    const taggedOrigins = originKeys.map(k=>CIGAR_ORIGINS[k].key.toLowerCase());
+    const taggedOrigins = originKeys.map(k=>STATE.cigarOrigins[k].key.toLowerCase());
     const other = cigars.filter(p=>!taggedOrigins.includes((p.cigarOrigin||"").trim().toLowerCase()));
     return `
       ${cigarCatRow()}
       <div class="cat-row">
-        ${originKeys.map(k=>`<button class="cat-btn" data-act="cigarnav" data-val="origin" data-origin="${k}">${esc(CIGAR_ORIGINS[k].label)}</button>`).join("")}
+        ${originKeys.map(k=>`<button class="cat-btn" data-act="cigarnav" data-val="origin" data-origin="${k}">${esc(STATE.cigarOrigins[k].label)}</button>`).join("")}
       </div>
       <div class="grid">
         ${other.map(p=>productCard(p)).join("") || `<div class="empty" style="grid-column:1/-1">No other cigars listed yet.</div>`}
       </div>`;
   }
 
-  const origin = CIGAR_ORIGINS[nav.originKey];
+  const origin = STATE.cigarOrigins[nav.originKey];
   if(!origin) return "";
 
   if(nav.level === "origin"){
@@ -627,7 +631,7 @@ function s_name(){ return STATE.session && STATE.session.name ? STATE.session.na
 
 /* ---------- ADMIN ---------- */
 function renderAdmin(){
-  const tabs = [["products","Products"],["orders","Orders"],["members","Members"],["invites","Invite Codes"],["homepage","Home Page"],["cigarbrands","Cigar Brands"],["settings","Settings"]];
+  const tabs = [["products","Products"],["orders","Orders"],["members","Members"],["invites","Invite Codes"],["homepage","Home Page"],["cigarorigins","Cigar Origins"],["cigarbrands","Cigar Brands"],["settings","Settings"]];
   const right = `<button class="icon-btn" data-act="refresh" title="Refresh">⟳</button>
     <button class="icon-btn" data-act="logout">⏻</button>`;
   const tabRow = `<div class="admin-tabs">${tabs.map(([k,l])=>`<button class="admin-tab ${STATE.adminTab===k?'active':''}" data-act="admintab" data-val="${k}">${l}</button>`).join("")}</div>`;
@@ -637,6 +641,7 @@ function renderAdmin(){
   else if(STATE.adminTab==="members") body = renderMembersAdmin();
   else if(STATE.adminTab==="invites") body = renderInvitesAdmin();
   else if(STATE.adminTab==="homepage") body = renderHomePageAdmin();
+  else if(STATE.adminTab==="cigarorigins") body = renderCigarOriginsAdmin();
   else if(STATE.adminTab==="cigarbrands") body = renderCigarBrandsAdmin();
   else if(STATE.adminTab==="settings") body = renderSettingsAdmin();
   return renderTopbar("Back Office", "Private Reserve — Proprietor View", right) + tabRow + `<div class="content">${body}</div>`;
@@ -668,13 +673,13 @@ function renderProductsAdmin(){
       <div class="field"><label>Origin</label>
         <select id="pf-origin">
           <option value="">— none —</option>
-          ${Object.values(CIGAR_ORIGINS).map(o=>`<option value="${esc(o.key)}" ${f&&f.cigarOrigin===o.key?'selected':''}>${esc(o.key)}</option>`).join("")}
+          ${Object.values(STATE.cigarOrigins).map(o=>`<option value="${esc(o.key)}" ${f&&f.cigarOrigin===o.key?'selected':''}>${esc(o.key)}</option>`).join("")}
         </select>
       </div>
       <div class="field"><label>Brand</label>
         <select id="pf-brand">
           <option value="">— none —</option>
-          ${Object.values(CIGAR_ORIGINS).map(o=>`<optgroup label="${esc(o.key)}">${o.brands.map(b=>`<option value="${esc(b)}" ${f&&f.cigarBrand===b?'selected':''}>${esc(b)}</option>`).join("")}</optgroup>`).join("")}
+          ${Object.values(STATE.cigarOrigins).map(o=>`<optgroup label="${esc(o.key)}">${o.brands.map(b=>`<option value="${esc(b)}" ${f&&f.cigarBrand===b?'selected':''}>${esc(b)}</option>`).join("")}</optgroup>`).join("")}
         </select>
       </div>
       <div class="field"><label>Line / Collection</label><input id="pf-line" value="${esc(f?f.cigarLine||'':'')}" placeholder="e.g. Siglo VI"/></div>
@@ -771,12 +776,46 @@ function renderHomePageAdmin(){
   </div>`;
 }
 
+function renderCigarOriginsAdmin(){
+  const origins = STATE.cigarOrigins || {};
+  return `<div class="panel">
+    <h3 class="section-label">Add New Origin</h3>
+    <p class="cart-row-sub" style="margin-bottom:12px">e.g. type "Nicaraguan" to create a "Nicaraguan Cigars" button on the Cigars page.</p>
+    <div class="field"><label>Origin name</label><input id="new-origin-name" placeholder="e.g. Nicaraguan"/></div>
+    <button class="primary-btn" data-act="addorigin">+ Add Origin</button>
+
+    <h3 class="section-label" style="margin-top:26px">Existing Origins</h3>
+    ${Object.entries(origins).map(([dictKey, o])=>`
+      <div style="border:1px solid var(--border);border-radius:5px;padding:14px;margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <div class="cart-row-name">${esc(o.label)}</div>
+          <button class="sm-btn" data-act="delorigin" data-val="${esc(dictKey)}">Delete Origin</button>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;margin:12px 0;font-size:12px;color:var(--muted)">
+          <input type="checkbox" data-act="togglelines" data-val="${esc(dictKey)}" ${o.hasLines?"checked":""}/>
+          Show a "Lines / Collections" step before products (use this if each brand has multiple product lines)
+        </label>
+        <div class="section-label" style="margin-top:10px">Brands under ${esc(o.label)}</div>
+        ${o.brands.length===0?`<div class="empty" style="padding:8px 0">No brands added yet.</div>`:""}
+        ${o.brands.map(b=>`
+          <div class="table-row">
+            <div class="flex2">${esc(b)}</div>
+            <button class="sm-btn" data-act="delbrand" data-origin="${esc(dictKey)}" data-brand="${esc(b)}">Remove</button>
+          </div>
+        `).join("")}
+        <div class="field" style="margin-top:10px"><label>Add a brand</label><input id="new-brand-${esc(dictKey)}" placeholder="e.g. Padrón"/></div>
+        <button class="ghost-btn" data-act="addbrand" data-val="${esc(dictKey)}">+ Add Brand</button>
+      </div>
+    `).join("")}
+  </div>`;
+}
+
 function renderCigarBrandsAdmin(){
   const imgs = STATE.cigarBrandImages || {};
   return `<div class="panel">
     <h3 class="section-label">Cigar Brand Images</h3>
     <p class="cart-row-sub" style="margin-bottom:14px">Set the photo shown on each brand card in the Cigars section. Tag your products with a matching Origin and Brand in the Products tab so they show up under the right one.</p>
-    ${Object.values(CIGAR_ORIGINS).map(o=>`
+    ${Object.values(STATE.cigarOrigins).map(o=>`
       <h3 class="section-label" style="margin-top:20px">${esc(o.label)}</h3>
       ${o.brands.map((b,i)=>`<div>${imageField(`cb-img-${o.key}-${i}`, imgs[b], b)}</div>`).join("")}
     `).join("")}
@@ -857,7 +896,7 @@ function handleAction(e){
       STATE.cigarNav = { level: "origin", originKey: el.dataset.origin, brand: null, line: null };
     } else if(val==="brand"){
       const originKey = el.dataset.origin || nav.originKey;
-      const origin = CIGAR_ORIGINS[originKey];
+      const origin = STATE.cigarOrigins[originKey];
       STATE.cigarNav = origin && origin.hasLines
         ? { level: "brand", originKey, brand: el.dataset.brand, line: null }
         : { level: "products", originKey, brand: el.dataset.brand, line: null };
@@ -868,7 +907,7 @@ function handleAction(e){
   }
   else if(act==="cigarback"){
     const nav = STATE.cigarNav;
-    const origin = nav.originKey ? CIGAR_ORIGINS[nav.originKey] : null;
+    const origin = nav.originKey ? STATE.cigarOrigins[nav.originKey] : null;
     if(nav.level==="products" && origin && origin.hasLines){
       STATE.cigarNav = { level: "brand", originKey: nav.originKey, brand: nav.brand, line: null };
     } else if(nav.level==="products" || nav.level==="brand"){
@@ -997,7 +1036,7 @@ function handleAction(e){
 
   else if(act==="savecigarbrands"){
     const imgs = {};
-    Object.values(CIGAR_ORIGINS).forEach(o=>{
+    Object.values(STATE.cigarOrigins).forEach(o=>{
       o.brands.forEach((b,i)=>{
         const v = document.getElementById(`cb-img-${o.key}-${i}`).value.trim();
         if(v) imgs[b] = v;
@@ -1006,6 +1045,47 @@ function handleAction(e){
     STATE.cigarBrandImages = imgs;
     setState({});
     flash("Brand images updated.");
+  }
+
+  else if(act==="addorigin"){
+    const name = document.getElementById("new-origin-name").value.trim();
+    if(!name) return flash("Enter an origin name.","err");
+    let dictKey = name.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"");
+    if(!dictKey) dictKey = "origin";
+    let uniqueKey = dictKey, n = 2;
+    while(STATE.cigarOrigins[uniqueKey]){ uniqueKey = `${dictKey}-${n}`; n++; }
+    STATE.cigarOrigins = { ...STATE.cigarOrigins, [uniqueKey]: { key: name, label: `${name} Cigars`, brands: [], hasLines: false } };
+    setState({});
+    flash(`"${name} Cigars" added.`);
+  }
+  else if(act==="delorigin"){
+    if(!confirm("Delete this origin? Products already tagged with it will keep their tag but won't show under a category card until reassigned.")) return;
+    const next = { ...STATE.cigarOrigins };
+    delete next[val];
+    STATE.cigarOrigins = next;
+    setState({});
+    flash("Origin deleted.");
+  }
+  else if(act==="togglelines"){
+    STATE.cigarOrigins = { ...STATE.cigarOrigins, [val]: { ...STATE.cigarOrigins[val], hasLines: el.checked } };
+    setState({});
+  }
+  else if(act==="addbrand"){
+    const input = document.getElementById(`new-brand-${val}`);
+    const name = input.value.trim();
+    if(!name) return flash("Enter a brand name.","err");
+    const origin = STATE.cigarOrigins[val];
+    if(origin.brands.includes(name)) return flash("That brand is already listed.","err");
+    STATE.cigarOrigins = { ...STATE.cigarOrigins, [val]: { ...origin, brands: [...origin.brands, name] } };
+    setState({});
+    flash("Brand added.");
+  }
+  else if(act==="delbrand"){
+    const originKey = el.dataset.origin, brand = el.dataset.brand;
+    const origin = STATE.cigarOrigins[originKey];
+    STATE.cigarOrigins = { ...STATE.cigarOrigins, [originKey]: { ...origin, brands: origin.brands.filter(b=>b!==brand) } };
+    setState({});
+    flash("Brand removed.");
   }
 }
 
