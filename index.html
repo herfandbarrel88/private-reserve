@@ -1277,7 +1277,36 @@ function handleAction(e){
 
 /* ================= PWA install prompt + service worker ================= */
 if("serviceWorker" in navigator){
-  window.addEventListener("load", ()=> navigator.serviceWorker.register("service-worker.js").catch(()=>{}));
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("service-worker.js").then(reg => {
+      reg.addEventListener("updatefound", () => {
+        const newWorker = reg.installing;
+        if(!newWorker) return;
+        newWorker.addEventListener("statechange", () => {
+          if(newWorker.state === "installed" && navigator.serviceWorker.controller){
+            showUpdateBanner();
+          }
+        });
+      });
+    }).catch(()=>{});
+    // Also check for an update every time the app is opened/foregrounded.
+    navigator.serviceWorker.getRegistration().then(reg => { if(reg) reg.update(); });
+    document.addEventListener("visibilitychange", () => {
+      if(document.visibilityState === "visible"){
+        navigator.serviceWorker.getRegistration().then(reg => { if(reg) reg.update(); });
+      }
+    });
+  });
+}
+function showUpdateBanner(){
+  const banner = document.getElementById("install-banner");
+  if(!banner) return;
+  banner.innerHTML = `<div class="install-banner">
+    <span>A new version of the app is ready.</span>
+    <button id="do-update">Update Now</button>
+  </div>`;
+  const btn = document.getElementById("do-update");
+  if(btn) btn.addEventListener("click", () => window.location.reload());
 }
 let deferredInstallPrompt = null;
 window.addEventListener("beforeinstallprompt",(e)=>{
