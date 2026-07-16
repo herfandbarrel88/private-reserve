@@ -1303,12 +1303,16 @@ async function boot(){
   document.getElementById("root").innerHTML =
     `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:#C9A15C;font-family:Georgia,serif;letter-spacing:1px">Loading the Reserve…</div>`;
   const ok = await pullShared(false);
-  if(!ok && !dbGet("pr_products", null)){
-    pushShared();
+  if(!ok){
+    // Couldn't reach the database — show what's cached locally on this device and stop.
+    // Never push local/default data back to the server here: doing so could overwrite
+    // real shared data with a stale or seed-only copy just because this one device
+    // couldn't connect at this moment.
+    flash("Couldn't reach the server — showing the last saved copy on this device.", "err");
   }
   if((STATE.homeLinks||[]).length < 8){
     while(STATE.homeLinks.length < 8) STATE.homeLinks.push({ label: "", image: "", target: "" });
-    pushShared();
+    if(ok){ try{ await sbUpsert("pr_home_links", STATE.homeLinks); }catch(e){ console.error(e); } }
   }
 
   const params = new URLSearchParams(window.location.search);
