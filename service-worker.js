@@ -1,4 +1,4 @@
-const CACHE = "private-reserve-v14";
+const CACHE = "private-reserve-v15";
 const ASSETS = ["./", "./index.html", "./manifest.json", "./admin.html", "./admin-manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (e) => {

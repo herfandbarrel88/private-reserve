@@ -797,7 +797,7 @@ function renderOrdersAdmin(){
             ${statuses.map(st=>`<option ${o.status===st?'selected':''}>${st}</option>`).join("")}
           </select>
         </div>
-        <div class="cart-row-sub">Ship to: ${esc(o.shipping.address)}, ${esc(o.shipping.city)}, ${esc(o.shipping.state)} ${esc(o.shipping.zip)} · card •••• ${esc(o.cardLast4)}</div>
+        <div class="cart-row-sub">Ship to: ${esc(o.shipping.address)}, ${esc(o.shipping.city)}, ${esc(o.shipping.state)} ${esc(o.shipping.zip)} · ${esc(o.cardLast4)}</div>
         <ul class="order-items">${o.items.map(it=>`<li>${it.qty} × ${esc(it.name)}${it.variantLabel?` (${esc(it.variantLabel)})`:""} — ${money(it.price*it.qty)}</li>`).join("")}</ul>
       </div>
     `).join("")}

@@ -66,7 +66,9 @@ exports.handler = async (event) => {
     if (!sessionId) return { statusCode: 400, body: JSON.stringify({ error: "Missing session_id." }) };
 
     const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    const session = await stripe.checkout.sessions.retrieve(sessionId, {
+      expand: ["payment_intent.payment_method"],
+    });
 
     if (session.payment_status !== "paid") {
       return { statusCode: 200, body: JSON.stringify({ paid: false }) };
@@ -99,6 +101,9 @@ exports.handler = async (event) => {
         }
       : { address: "", city: "", state: "", zip: "" };
 
+    const card = session.payment_intent && session.payment_intent.payment_method && session.payment_intent.payment_method.card;
+    const cardLabel = card ? `${card.brand.charAt(0).toUpperCase()}${card.brand.slice(1)} ····${card.last4}` : "Paid via Stripe";
+
     const order = {
       id: "ord_" + sessionId.slice(-16),
       orderNo: genOrderNo(),
@@ -108,7 +113,7 @@ exports.handler = async (event) => {
       total: (session.amount_total || 0) / 100,
       status: "Received",
       shipping,
-      cardLast4: "stripe",
+      cardLast4: cardLabel,
       createdAt: Date.now(),
       stripeSessionId: sessionId,
     };
