@@ -237,16 +237,30 @@ async function sbUpsert(key, value){
   if(!res.ok) throw new Error("Supabase upsert failed: " + res.status);
 }
 async function pushShared(){
+  if(!ADMIN_PASSCODE){
+    console.error("pushShared called without an authenticated admin session");
+    flash("Not authorized to save changes.", "err");
+    return;
+  }
   try{
-    await Promise.all([
-      sbUpsert("pr_products", STATE.products),
-      sbUpsert("pr_members", STATE.members),
-      sbUpsert("pr_invites", STATE.invites),
-      sbUpsert("pr_orders", STATE.orders),
-      sbUpsert("pr_home_links", STATE.homeLinks),
-      sbUpsert("pr_cigar_brand_images", STATE.cigarBrandImages),
-      sbUpsert("pr_cigar_origins", STATE.cigarOrigins),
-    ]);
+    const updates = {
+      pr_products: STATE.products,
+      pr_members: STATE.members,
+      pr_invites: STATE.invites,
+      pr_orders: STATE.orders,
+      pr_home_links: STATE.homeLinks,
+      pr_cigar_brand_images: STATE.cigarBrandImages,
+      pr_cigar_origins: STATE.cigarOrigins,
+    };
+    const res = await fetch("/.netlify/functions/admin-write", {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ passcode: ADMIN_PASSCODE, updates }),
+    });
+    const data = await res.json();
+    if(!data.ok){
+      flash(data.error || "Couldn't save changes.", "err");
+      return;
+    }
     dbSet("pr_products", STATE.products); dbSet("pr_members", STATE.members);
     dbSet("pr_invites", STATE.invites); dbSet("pr_orders", STATE.orders);
     dbSet("pr_home_links", STATE.homeLinks);
@@ -342,6 +356,8 @@ const DEFAULT_HOME_LINKS = [
   { image: "", label: "", target: "" },
 ];
 
+let ADMIN_PASSCODE = null; // held in memory only for this session, never persisted — authorizes writes
+
 let STATE = {
   products: dbGet("pr_products", null) || SEED_PRODUCTS,
   members: dbGet("pr_members", {}),
@@ -369,7 +385,9 @@ if(!dbGet("pr_cigar_origins", null)) dbSet("pr_cigar_origins", STATE.cigarOrigin
 
 function persist(){
   dbSet("pr_session", STATE.session); // session stays local to this device on purpose
-  pushShared(); // fire-and-forget sync of products/members/invites/orders/adminPass to Supabase
+  if(ADMIN_PASSCODE){
+    pushShared(); // fire-and-forget sync of shared data to Supabase — admin sessions only
+  }
 }
 function flash(msg, kind){
   STATE.toast = {msg, kind: kind||"ok"};
@@ -1057,12 +1075,13 @@ function handleAction(e){
     }).then(r=>r.json()).then(data=>{
       btn.disabled = false;
       if(!data.ok) return flash(data.error || "Incorrect proprietor passcode.", "err");
+      ADMIN_PASSCODE = pass;
       setState({session:{type:"admin"}, adminTab:"products"});
       pullShared(false).then(()=>render());
     }).catch(()=>{ btn.disabled = false; flash("Couldn't reach the server. Try again.", "err"); });
   }
 
-  else if(act==="logout"){ setState({session:null, cart:{}}); }
+  else if(act==="logout"){ ADMIN_PASSCODE = null; setState({session:null, cart:{}}); }
 
   else if(act==="refresh"){ pullShared(true).then(()=>render()); }
 
@@ -1153,6 +1172,7 @@ function handleAction(e){
   else if(act==="editproduct"){ STATE.productForm = val; render(); }
   else if(act==="canceledit"){ STATE.productForm = null; render(); }
   else if(act==="delproduct"){
+    if(!confirm("Delete this product? This can't be undone.")) return;
     STATE.products = STATE.products.filter(p=>p.id!==val);
     if(STATE.productForm===val) STATE.productForm=null;
     setState({}); flash("Product removed.");
@@ -1216,6 +1236,7 @@ function handleAction(e){
     }).then(r=>r.json()).then(data=>{
       btn.disabled = false;
       if(!data.ok) return flash(data.error || "Couldn't update passcode.", "err");
+      ADMIN_PASSCODE = next;
       flash("Passcode updated.");
       render();
     }).catch(()=>{ btn.disabled = false; flash("Couldn't reach the server. Try again.", "err"); });
@@ -1363,7 +1384,6 @@ async function boot(){
   }
   if((STATE.homeLinks||[]).length < 8){
     while(STATE.homeLinks.length < 8) STATE.homeLinks.push({ label: "", image: "", target: "" });
-    if(ok){ try{ await sbUpsert("pr_home_links", STATE.homeLinks); }catch(e){ console.error(e); } }
   }
 
   const params = new URLSearchParams(window.location.search);
