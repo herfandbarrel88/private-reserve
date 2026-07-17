@@ -19,8 +19,8 @@ async function sbSet(key, value) {
   await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=key`, {
     method: "POST",
     headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
       "Content-Type": "application/json",
       Prefer: "resolution=merge-duplicates,return=minimal",
     },
@@ -34,7 +34,7 @@ async function sendOrderEmail(order) {
   if (!process.env.RESEND_API_KEY) return; // silently skip if not configured yet
   try {
     const itemsHtml = order.items.map(
-      (it) => `<li>${it.qty} × ${it.name} — $${(it.price * it.qty).toFixed(2)}</li>`
+      (it) => `<li>${it.qty} × ${it.name}${it.variantLabel?` (${it.variantLabel})`:""} — $${(it.price * it.qty).toFixed(2)}</li>`
     ).join("");
     await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -66,7 +66,9 @@ exports.handler = async (event) => {
     if (!sessionId) return { statusCode: 400, body: JSON.stringify({ error: "Missing session_id." }) };
 
     const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    const session = await stripe.checkout.sessions.retrieve(sessionId, {
+      expand: ["payment_intent.payment_method"],
+    });
 
     if (session.payment_status !== "paid") {
       return { statusCode: 200, body: JSON.stringify({ paid: false }) };
@@ -84,7 +86,10 @@ exports.handler = async (event) => {
 
     const orderItems = cartItems.map((c) => {
       const p = products.find((pp) => pp.id === c.id);
-      return { id: c.id, name: p ? p.name : c.id, price: p ? p.price : 0, qty: c.qty };
+      const isBox = c.variant === "box";
+      const price = p ? (isBox ? Number(p.boxPrice) || 0 : p.price) : 0;
+      const variantLabel = p && isBox ? (p.boxLabel || "Box") : "Single";
+      return { id: c.id, name: p ? p.name : c.id, variant: c.variant || "single", variantLabel, price, qty: c.qty };
     });
 
     const shipping = session.shipping_details && session.shipping_details.address
@@ -96,6 +101,9 @@ exports.handler = async (event) => {
         }
       : { address: "", city: "", state: "", zip: "" };
 
+    const card = session.payment_intent && session.payment_intent.payment_method && session.payment_intent.payment_method.card;
+    const cardLabel = card ? `${card.brand.charAt(0).toUpperCase()}${card.brand.slice(1)} ····${card.last4}` : "Paid via Stripe";
+
     const order = {
       id: "ord_" + sessionId.slice(-16),
       orderNo: genOrderNo(),
@@ -105,14 +113,14 @@ exports.handler = async (event) => {
       total: (session.amount_total || 0) / 100,
       status: "Received",
       shipping,
-      cardLast4: "stripe",
+      cardLast4: cardLabel,
       createdAt: Date.now(),
       stripeSessionId: sessionId,
     };
 
     const updatedProducts = products.map((p) => {
-      const inCart = cartItems.find((c) => c.id === p.id);
-      return inCart ? { ...p, stock: Math.max(0, p.stock - inCart.qty) } : p;
+      const totalQty = cartItems.filter((c) => c.id === p.id).reduce((s, c) => s + c.qty, 0);
+      return totalQty > 0 ? { ...p, stock: Math.max(0, p.stock - totalQty) } : p;
     });
 
     await Promise.all([
