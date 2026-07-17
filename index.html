@@ -209,7 +209,7 @@ const SEED_PRODUCTS = [
 
 const SUPABASE_URL = "https://njlrcamdlghcvzkwpbff.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qbHJjYW1kbGdoY3Z6a3dwYmZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1Nzg5MjIsImV4cCI6MjA5OTE1NDkyMn0.ul4nyNg2Lbwl3LKJ2qW6ogOw_xkgNYRwuAApOHO8CKI";
-const SHARED_KEYS = ["pr_products","pr_members","pr_invites","pr_orders","pr_admin_pass","pr_home_links","pr_cigar_brand_images","pr_cigar_origins"];
+const SHARED_KEYS = ["pr_products","pr_members","pr_invites","pr_orders","pr_home_links","pr_cigar_brand_images","pr_cigar_origins"];
 
 function sbHeaders(extra){
   return Object.assign({
@@ -243,14 +243,13 @@ async function pushShared(){
       sbUpsert("pr_members", STATE.members),
       sbUpsert("pr_invites", STATE.invites),
       sbUpsert("pr_orders", STATE.orders),
-      sbUpsert("pr_admin_pass", STATE.adminPass),
       sbUpsert("pr_home_links", STATE.homeLinks),
       sbUpsert("pr_cigar_brand_images", STATE.cigarBrandImages),
       sbUpsert("pr_cigar_origins", STATE.cigarOrigins),
     ]);
     dbSet("pr_products", STATE.products); dbSet("pr_members", STATE.members);
     dbSet("pr_invites", STATE.invites); dbSet("pr_orders", STATE.orders);
-    dbSet("pr_admin_pass", STATE.adminPass); dbSet("pr_home_links", STATE.homeLinks);
+    dbSet("pr_home_links", STATE.homeLinks);
     dbSet("pr_cigar_brand_images", STATE.cigarBrandImages); dbSet("pr_cigar_origins", STATE.cigarOrigins);
   }catch(e){
     console.error("sync failed", e);
@@ -264,13 +263,12 @@ async function pullShared(showFlash){
     if(remote.pr_members) STATE.members = remote.pr_members;
     if(remote.pr_invites) STATE.invites = remote.pr_invites;
     if(remote.pr_orders) STATE.orders = remote.pr_orders;
-    if(remote.pr_admin_pass) STATE.adminPass = remote.pr_admin_pass;
     if(remote.pr_home_links) STATE.homeLinks = remote.pr_home_links;
     if(remote.pr_cigar_brand_images) STATE.cigarBrandImages = remote.pr_cigar_brand_images;
     if(remote.pr_cigar_origins) STATE.cigarOrigins = remote.pr_cigar_origins;
     dbSet("pr_products", STATE.products); dbSet("pr_members", STATE.members);
     dbSet("pr_invites", STATE.invites); dbSet("pr_orders", STATE.orders);
-    dbSet("pr_admin_pass", STATE.adminPass); dbSet("pr_home_links", STATE.homeLinks);
+    dbSet("pr_home_links", STATE.homeLinks);
     dbSet("pr_cigar_brand_images", STATE.cigarBrandImages); dbSet("pr_cigar_origins", STATE.cigarOrigins);
     if(showFlash) flash("Refreshed.");
     return true;
@@ -987,8 +985,9 @@ function renderCigarBrandsAdmin(){
 function renderSettingsAdmin(){
   return `<div class="panel">
     <h3 class="section-label">Proprietor Passcode</h3>
-    <p class="cart-row-sub" style="margin-bottom:12px">This passcode reaches the Back Office from the entry screen. Keep it private.</p>
-    <div class="field"><label>Passcode</label><input id="set-pass" value="${esc(STATE.adminPass)}"/></div>
+    <p class="cart-row-sub" style="margin-bottom:12px">This passcode reaches the Back Office from the entry screen. Keep it private. For security, it's no longer shown here — enter your current one to confirm before setting a new one.</p>
+    <div class="field"><label>Current passcode</label><input id="set-pass-current" type="password" placeholder="••••••••"/></div>
+    <div class="field"><label>New passcode</label><input id="set-pass-new" type="password" placeholder="4+ characters"/></div>
     <button class="primary-btn" data-act="savepass">Save Passcode</button>
   </div>`;
 }
@@ -1019,11 +1018,16 @@ function handleAction(e){
   else if(act==="signin"){
     const email = document.getElementById("in-email").value.trim().toLowerCase();
     const pass = document.getElementById("in-pass").value;
-    const m = STATE.members[email];
-    if(!m || !m.active) return flash("No active membership found for that email.","err");
-    if(m.password !== pass) return flash("Incorrect password.","err");
-    setState({session:{type:"member", email:m.email, name:m.name}, storeScreen:"shop"});
-    pullShared(false).then(()=>render());
+    const btn = el; btn.disabled = true;
+    fetch("/.netlify/functions/member-auth", {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ action: "signin", email, password: pass }),
+    }).then(r=>r.json()).then(data=>{
+      btn.disabled = false;
+      if(!data.ok) return flash(data.error || "Couldn't sign in.", "err");
+      setState({session:{type:"member", email:data.member.email, name:data.member.name}, storeScreen:"shop"});
+      pullShared(false).then(()=>render());
+    }).catch(()=>{ btn.disabled = false; flash("Couldn't reach the server. Try again.", "err"); });
   }
 
   else if(act==="redeem"){
@@ -1031,21 +1035,31 @@ function handleAction(e){
     const name = document.getElementById("rd-name").value.trim();
     const email = document.getElementById("rd-email").value.trim().toLowerCase();
     const pass = document.getElementById("rd-pass").value;
-    const invite = STATE.invites[code];
-    if(!invite || invite.used) return flash("That invite code is invalid or already used.","err");
-    if(!name || !email || pass.length<4) return flash("Fill in your name, email, and a password (4+ characters).","err");
-    if(STATE.members[email]) return flash("An account with that email already exists — sign in instead.","err");
-    STATE.invites[code] = {...invite, used:true, usedAt:Date.now()};
-    STATE.members[email] = {email, name, password:pass, active:true, joinedAt:Date.now(), invitedBy:code};
-    setState({session:{type:"member", email, name}, storeScreen:"shop"});
-    flash("Membership activated. Welcome in.");
+    const btn = el; btn.disabled = true;
+    fetch("/.netlify/functions/member-auth", {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ action: "redeem", code, name, email, password: pass }),
+    }).then(r=>r.json()).then(data=>{
+      btn.disabled = false;
+      if(!data.ok) return flash(data.error || "Couldn't activate membership.", "err");
+      setState({session:{type:"member", email:data.member.email, name:data.member.name}, storeScreen:"shop"});
+      flash("Membership activated. Welcome in.");
+      pullShared(false).then(()=>render());
+    }).catch(()=>{ btn.disabled = false; flash("Couldn't reach the server. Try again.", "err"); });
   }
 
   else if(act==="adminlogin"){
     const pass = document.getElementById("ad-pass").value;
-    if(pass !== STATE.adminPass) return flash("Incorrect proprietor passcode.","err");
-    setState({session:{type:"admin"}, adminTab:"products"});
-    pullShared(false).then(()=>render());
+    const btn = el; btn.disabled = true;
+    fetch("/.netlify/functions/admin-auth", {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ action: "check", passcode: pass }),
+    }).then(r=>r.json()).then(data=>{
+      btn.disabled = false;
+      if(!data.ok) return flash(data.error || "Incorrect proprietor passcode.", "err");
+      setState({session:{type:"admin"}, adminTab:"products"});
+      pullShared(false).then(()=>render());
+    }).catch(()=>{ btn.disabled = false; flash("Couldn't reach the server. Try again.", "err"); });
   }
 
   else if(act==="logout"){ setState({session:null, cart:{}}); }
@@ -1192,11 +1206,19 @@ function handleAction(e){
   }
 
   else if(act==="savepass"){
-    const v = document.getElementById("set-pass").value;
-    if(v.length<4) return flash("Use at least 4 characters.","err");
-    STATE.adminPass = v;
-    setState({});
-    flash("Passcode updated.");
+    const current = document.getElementById("set-pass-current").value;
+    const next = document.getElementById("set-pass-new").value;
+    if(next.length<4) return flash("New passcode must be at least 4 characters.","err");
+    const btn = el; btn.disabled = true;
+    fetch("/.netlify/functions/admin-auth", {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ action: "set", currentPasscode: current, newPasscode: next }),
+    }).then(r=>r.json()).then(data=>{
+      btn.disabled = false;
+      if(!data.ok) return flash(data.error || "Couldn't update passcode.", "err");
+      flash("Passcode updated.");
+      render();
+    }).catch(()=>{ btn.disabled = false; flash("Couldn't reach the server. Try again.", "err"); });
   }
 
   else if(act==="savehomelinks"){
