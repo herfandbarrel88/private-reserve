@@ -1,4 +1,4 @@
-const CACHE = "private-reserve-v24";
+const CACHE = "private-reserve-v25";
 const ASSETS = ["./", "./index.html", "./manifest.json", "./admin.html", "./admin-manifest.json", "./icon-192.png", "./icon-512.png"];
 const PAGE_PATHS = ["/", "/index.html", "/admin.html"];
 

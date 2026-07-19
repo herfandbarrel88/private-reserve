@@ -399,7 +399,11 @@ function persist(){
 function flash(msg, kind){
   STATE.toast = {msg, kind: kind||"ok"};
   render();
-  setTimeout(()=>{ STATE.toast=null; render(); }, 3000);
+  setTimeout(()=>{
+    STATE.toast = null;
+    const t = document.getElementById("toast-el");
+    if(t) t.remove(); else render();
+  }, 3000);
 }
 function setState(patch){ Object.assign(STATE, patch); persist(); render(); }
 
@@ -449,7 +453,7 @@ function renderGate(){
 function renderApp(){
   const s = STATE.session;
   return `
-    ${STATE.toast ? `<div class="toast" style="background:${STATE.toast.kind==='err'?'#5c2420':'#2c3d2e'}">${esc(STATE.toast.msg)}</div>` : ""}
+    ${STATE.toast ? `<div class="toast" id="toast-el" style="background:${STATE.toast.kind==='err'?'#5c2420':'#2c3d2e'}">${esc(STATE.toast.msg)}</div>` : ""}
     <div class="top-banner">FREE delivery across Australia</div>
     <div class="app">
       ${s.type==='admin' ? renderAdmin() : renderStore()}
@@ -1351,7 +1355,9 @@ if("serviceWorker" in navigator){
     document.addEventListener("visibilitychange", () => {
       if(document.visibilityState === "visible"){
         navigator.serviceWorker.getRegistration().then(reg => { if(reg) reg.update(); });
-        if(STATE.session){ pullShared(false).then(()=>render()); }
+        // Only auto-refresh for customer (member) sessions — never for admin, since
+        // this would interrupt someone actively typing into a Back Office form.
+        if(STATE.session && STATE.session.type === "member"){ pullShared(false).then(()=>render()); }
       }
     });
   });
