@@ -190,12 +190,12 @@ const DEFAULT_CIGAR_ORIGINS = {
   cuban: {
     key: "Cuban", label: "Cuban Cigars",
     brands: ["Cohiba","Montecristo","Romeo y Julieta","Partagás","Bolívar","H. Upmann","Hoyo de Monterrey","Trinidad"],
-    hasLines: true, // brand click shows line cards, derived from products, before showing products
+    hasLines: true,
   },
   davidoff: {
     key: "Davidoff", label: "Davidoff Cigars",
     brands: ["Aniversario","Escurio","Gran Cru","Millennium","Nicaragua","Signature","Winston Churchill","Zino"],
-    hasLines: false, // brand click shows products directly
+    hasLines: false,
   },
 };
 const SEED_PRODUCTS = [
@@ -571,20 +571,13 @@ function renderCigarsPage(){
           }).join("")}
         </div>`;
     }
-    // Other origins skip the brand step entirely — go straight from origin to lines.
-    const originCigars = cigars.filter(p=>(p.cigarOrigin||"").trim().toLowerCase()===origin.key.toLowerCase());
-    const lines = byName([...new Set(originCigars.map(p=>p.cigarLine).filter(Boolean))]);
+    // Other origins skip brand and line entirely — products show right on the origin page.
+    const originCigars = productsByName(cigars.filter(p=>(p.cigarOrigin||"").trim().toLowerCase()===origin.key.toLowerCase()));
     return `
       ${cigarCatRow()}
       ${cigarBreadcrumb()}
-      <div class="home-links-grid">
-        ${lines.map(line=>{
-          const sample = originCigars.find(p=>p.cigarLine===line);
-          return `<button class="home-link-box" data-act="cigarnav" data-val="line" data-line="${esc(line)}">
-            <div class="home-link-img">${sample&&sample.image?`<img src="${esc(sample.image)}" style="width:100%;height:100%;object-fit:cover;border-radius:4px"/>`:`<span class="p-img-fallback">🚬</span>`}</div>
-            <div class="home-link-label">${esc(line)}</div>
-          </button>`;
-        }).join("") || `<div class="empty" style="grid-column:1/-1">No lines added for ${esc(origin.label)} yet — add products in the Back Office and tag them with a Line.</div>`}
+      <div class="grid">
+        ${originCigars.map(p=>productCard(p)).join("") || `<div class="empty" style="grid-column:1/-1">No products added for ${esc(origin.label)} yet — add one in the Back Office and set its Origin to "${esc(origin.key)}".</div>`}
       </div>`;
   }
 
@@ -640,9 +633,7 @@ function renderStore(){
       const q = STATE.searchQuery.toLowerCase();
       const results = productsByName(STATE.products.filter(p=>
         p.name.toLowerCase().includes(q) ||
-        (p.description||"").toLowerCase().includes(q) ||
-        (p.cigarBrand||"").toLowerCase().includes(q) ||
-        (p.cigarLine||"").toLowerCase().includes(q)
+        (p.description||"").toLowerCase().includes(q)
       ));
       body = `
       ${searchBar()}
@@ -781,7 +772,7 @@ function renderProductsAdmin(){
       </div>
       <div class="field"><label>Line / Collection</label><input id="pf-line" value="${esc(f?f.cigarLine||'':'')}" placeholder="e.g. Siglo VI"/></div>
     </div>
-    <p class="small-note" style="margin-top:-6px">For any origin other than Cuban or Davidoff, just set Origin and Line — leave Brand blank.</p>
+    <p class="small-note" style="margin-top:-6px">For any origin other than Cuban or Davidoff, just set Origin — leave Brand and Line blank. The product shows up right on its origin page.</p>
     <div style="display:flex;gap:10px">
       <button class="primary-btn" data-act="saveproduct" data-val="${editing||''}">${f?"Save Changes":"Add Product"}</button>
       ${f?`<button class="ghost-btn" data-act="canceledit">Cancel</button>`:""}
@@ -864,7 +855,7 @@ function buildHomeLinkOptions(selectedTarget){
     return `<option value="${esc(v)}" ${selectedTarget===v?'selected':''}>${esc(o.label)}</option>`;
   }).join("") + `</optgroup>`;
   Object.entries(STATE.cigarOrigins).forEach(([k,o])=>{
-    if(o.brands.length && originUsesBrands(k)){
+    if(o.brands && o.brands.length && originUsesBrands(k)){
       html += `<optgroup label="${esc(o.label)} — Brand">` + o.brands.map(b=>{
         const v = `brand:${k}:${b}`;
         return `<option value="${esc(v)}" ${selectedTarget===v?'selected':''}>${esc(b)}</option>`;
@@ -953,7 +944,7 @@ function renderCigarOriginsAdmin(){
   const origins = STATE.cigarOrigins || {};
   return `<div class="panel">
     <h3 class="section-label">Add New Origin</h3>
-    <p class="cart-row-sub" style="margin-bottom:12px">e.g. type "Nicaraguan" to create a "Nicaraguan Cigars" button on the Cigars page. For any origin other than Cuban and Davidoff, customers go straight from the origin to Lines — just tag products with an Origin and a Line in the Products tab, no Brand needed.</p>
+    <p class="cart-row-sub" style="margin-bottom:12px">e.g. type "Nicaraguan" to create a "Nicaraguan Cigars" button on the Cigars page. For any origin other than Cuban and Davidoff, customers go straight from the origin to products — just tag products with an Origin in the Products tab, no Brand needed.</p>
     <div class="field"><label>Origin name</label><input id="new-origin-name" placeholder="e.g. Nicaraguan"/></div>
     <button class="primary-btn" data-act="addorigin">+ Add Origin</button>
 
@@ -970,8 +961,8 @@ function renderCigarOriginsAdmin(){
             Show a "Lines / Collections" step before products (use this if each brand has multiple product lines)
           </label>
           <div class="section-label" style="margin-top:10px">Brands under ${esc(o.label)}</div>
-          ${o.brands.length===0?`<div class="empty" style="padding:8px 0">No brands added yet.</div>`:""}
-          ${o.brands.map(b=>`
+          ${(o.brands||[]).length===0?`<div class="empty" style="padding:8px 0">No brands added yet.</div>`:""}
+          ${(o.brands||[]).map(b=>`
             <div class="table-row">
               <div class="flex2">${esc(b)}</div>
               <button class="sm-btn" data-act="delbrand" data-origin="${esc(dictKey)}" data-brand="${esc(b)}">Remove</button>
@@ -980,7 +971,7 @@ function renderCigarOriginsAdmin(){
           <div class="field" style="margin-top:10px"><label>Add a brand</label><input id="new-brand-${esc(dictKey)}" placeholder="e.g. Padrón"/></div>
           <button class="ghost-btn" data-act="addbrand" data-val="${esc(dictKey)}">+ Add Brand</button>
         ` : `
-          <p class="cart-row-sub" style="margin-top:10px">Customers browsing ${esc(o.label)} go straight to Lines. Tag products with Origin "${esc(o.key)}" and a Line in the Products tab and they'll show up here automatically — no brand to set up.</p>
+          <p class="cart-row-sub" style="margin-top:10px">Tag a product with Origin "${esc(o.key)}" in the Products tab and it'll show up right here automatically — no brand to set up.</p>
         `}
       </div>
     `).join("")}
@@ -992,9 +983,9 @@ function renderCigarBrandsAdmin(){
   return `<div class="panel">
     <h3 class="section-label">Cigar Brand Images</h3>
     <p class="cart-row-sub" style="margin-bottom:14px">Set the photo shown on each brand card in the Cigars section. Tag your products with a matching Origin and Brand in the Products tab so they show up under the right one.</p>
-    ${Object.values(STATE.cigarOrigins).map(o=>`
+    ${Object.entries(STATE.cigarOrigins).filter(([k])=>originUsesBrands(k)).map(([,o])=>`
       <h3 class="section-label" style="margin-top:20px">${esc(o.label)}</h3>
-      ${o.brands.map((b,i)=>`<div>${imageField(`cb-img-${o.key}-${i}`, imgs[b], b)}</div>`).join("")}
+      ${(o.brands||[]).map((b,i)=>`<div>${imageField(`cb-img-${o.key}-${i}`, imgs[b], b)}</div>`).join("")}
     `).join("")}
     <button class="primary-btn" data-act="savecigarbrands">Save Brand Images</button>
   </div>`;
@@ -1263,19 +1254,6 @@ function handleAction(e){
     setState({});
   }
 
-  else if(act==="savecigarbrands"){
-    const imgs = {};
-    Object.values(STATE.cigarOrigins).forEach(o=>{
-      o.brands.forEach((b,i)=>{
-        const v = document.getElementById(`cb-img-${o.key}-${i}`).value.trim();
-        if(v) imgs[b] = v;
-      });
-    });
-    STATE.cigarBrandImages = imgs;
-    setState({});
-    flash("Brand images updated.");
-  }
-
   else if(act==="addorigin"){
     const name = document.getElementById("new-origin-name").value.trim();
     if(!name) return flash("Enter an origin name.","err");
@@ -1304,17 +1282,32 @@ function handleAction(e){
     const name = input.value.trim();
     if(!name) return flash("Enter a brand name.","err");
     const origin = STATE.cigarOrigins[val];
-    if(origin.brands.includes(name)) return flash("That brand is already listed.","err");
-    STATE.cigarOrigins = { ...STATE.cigarOrigins, [val]: { ...origin, brands: [...origin.brands, name] } };
+    if((origin.brands||[]).includes(name)) return flash("That brand is already listed.","err");
+    STATE.cigarOrigins = { ...STATE.cigarOrigins, [val]: { ...origin, brands: [...(origin.brands||[]), name] } };
     setState({});
     flash("Brand added.");
   }
   else if(act==="delbrand"){
     const originKey = el.dataset.origin, brand = el.dataset.brand;
     const origin = STATE.cigarOrigins[originKey];
-    STATE.cigarOrigins = { ...STATE.cigarOrigins, [originKey]: { ...origin, brands: origin.brands.filter(b=>b!==brand) } };
+    STATE.cigarOrigins = { ...STATE.cigarOrigins, [originKey]: { ...origin, brands: (origin.brands||[]).filter(b=>b!==brand) } };
     setState({});
     flash("Brand removed.");
+  }
+  else if(act==="savecigarbrands"){
+    const imgs = {};
+    Object.values(STATE.cigarOrigins).forEach(o=>{
+      (o.brands||[]).forEach((b,i)=>{
+        const fieldEl = document.getElementById(`cb-img-${o.key}-${i}`);
+        if(fieldEl){
+          const v = fieldEl.value.trim();
+          if(v) imgs[b] = v;
+        }
+      });
+    });
+    STATE.cigarBrandImages = imgs;
+    setState({});
+    flash("Brand images updated.");
   }
 }
 
