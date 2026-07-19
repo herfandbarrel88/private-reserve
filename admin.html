@@ -387,6 +387,13 @@ function persist(){
   dbSet("pr_session", STATE.session); // session stays local to this device on purpose
   if(ADMIN_PASSCODE){
     pushShared(); // fire-and-forget sync of shared data to Supabase — admin sessions only
+  } else if(STATE.session && STATE.session.type === "admin"){
+    // Session says admin, but there's no passcode in memory to authorize the save.
+    // Never fail silently here — send them back to log in properly instead.
+    STATE.session = null;
+    dbSet("pr_session", null);
+    flash("Your session needs to be refreshed — please log in again.", "err");
+    render();
   }
 }
 function flash(msg, kind){
@@ -1382,6 +1389,16 @@ function isStandalone(){ return window.matchMedia("(display-mode: standalone)").
 async function boot(){
   document.getElementById("root").innerHTML =
     `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:#C9A15C;font-family:Georgia,serif;letter-spacing:1px">Loading the Reserve…</div>`;
+
+  // The Proprietor passcode only ever lives in memory, never saved to the device.
+  // A page reload wipes it — but the "logged in as admin" session can survive the
+  // reload via local storage. Without this check, that combination silently breaks
+  // every save (nothing reaches the server) while looking completely normal.
+  if(STATE.session && STATE.session.type === "admin" && !ADMIN_PASSCODE){
+    STATE.session = null;
+    dbSet("pr_session", null);
+  }
+
   const ok = await pullShared(false);
   if(!ok){
     // Couldn't reach the database — show what's cached locally on this device and stop.
