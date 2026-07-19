@@ -1017,10 +1017,24 @@ function bindEvents(){
   }
 }
 
-function handleAction(e){
+const SHARED_MUTATING_ACTIONS = new Set([
+  "saveproduct","delproduct","togglemember","geninvite","revokeinvite",
+  "orderstatus","savehomelinks","addhomebox","delhomebox",
+  "addorigin","delorigin","togglelines","addbrand","delbrand","savecigarbrands",
+]);
+
+async function handleAction(e){
   const el = e.currentTarget;
   const act = el.dataset.act;
   const val = el.dataset.val;
+
+  // Before any save that touches shared data, pull the freshest copy from the
+  // server first. Without this, a browser tab left open a while could push a
+  // stale, incomplete product list and silently overwrite newer changes made
+  // elsewhere — this closes that gap.
+  if(SHARED_MUTATING_ACTIONS.has(act) && ADMIN_PASSCODE){
+    await pullShared(false);
+  }
 
   if(act==="gatetab"){ STATE.gateTab = val; STATE.toast=null; render(); }
 
