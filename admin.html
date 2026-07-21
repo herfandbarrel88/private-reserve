@@ -44,9 +44,8 @@
     background:radial-gradient(ellipse at top, #1E1916 0%, #121110 70%);}
   .gate-card{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--border2);
     border-radius:6px;padding:30px 24px;box-shadow:0 20px 60px rgba(0,0,0,.5);}
-  .seal{width:52px;height:52px;border-radius:50%;border:1px solid var(--gold);color:var(--gold);
-    display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;font-size:18px;
-    letter-spacing:2px;margin:0 auto 14px;}
+  .seal{width:64px;height:64px;margin:0 auto 14px;}
+  .seal img{width:100%;height:100%;display:block;}
   .gate-title{font-family:"Boucherie Block",Georgia,serif;text-align:center;font-size:26px;letter-spacing:.5px;margin-bottom:6px;}
   .gate-sub{text-align:center;font-size:12.5px;color:var(--muted);margin-bottom:22px;line-height:1.5;}
   .tab-row{display:flex;gap:4px;background:var(--surface2);border-radius:5px;padding:4px;margin-bottom:20px;}
@@ -70,6 +69,8 @@
   /* App shell */
   .topbar{display:flex;align-items:center;justify-content:space-between;padding:18px 16px;
     border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:5;}
+  .topbar-title-row{display:flex;align-items:center;gap:10px;}
+  .topbar-logo{width:34px;height:34px;flex-shrink:0;}
   .topbar .title{font-family:"Boucherie Block",Georgia,serif;font-size:20px;}
   .topbar .subtitle{font-size:11px;color:var(--muted);margin-top:2px;}
   .icon-btn{background:transparent;border:1px solid var(--border2);color:var(--text);border-radius:20px;
@@ -455,12 +456,12 @@ function render(){
 function renderGate(){
   const t = STATE.gateTab;
   return `
-  <div class="top-banner">FREE delivery across Australia</div>
+  <div class="top-banner">ORDERS OVER $300 - FREE DELIVERY ACROSS AUSTRALIA.</div>
   <div class="gate-wrap">
     <div class="gate-card">
-      <div class="seal">PR</div>
+      <div class="seal"><img src="logo.png" alt="The Private Reserve"/></div>
       <h1 class="gate-title">The Private Reserve</h1>
-      <p class="gate-sub">Members-only. Cigars, spirits &amp; accessories. Access by invitation.</p>
+      <p class="gate-sub">Access by invitation.</p>
       <div class="tab-row">
         <button class="tab-btn ${t==='signin'?'active':''}" data-act="gatetab" data-val="signin">Sign In</button>
         <button class="tab-btn ${t==='redeem'?'active':''}" data-act="gatetab" data-val="redeem">Redeem Invite</button>
@@ -490,7 +491,7 @@ function renderApp(){
   const s = STATE.session;
   return `
     ${STATE.toast ? `<div class="toast" id="toast-el" style="background:${STATE.toast.kind==='err'?'#5c2420':'#2c3d2e'}">${esc(STATE.toast.msg)}</div>` : ""}
-    <div class="top-banner">FREE delivery across Australia</div>
+    <div class="top-banner">ORDERS OVER $300 - FREE DELIVERY ACROSS AUSTRALIA.</div>
     <div class="app">
       ${s.type==='admin' ? renderAdmin() : renderStore()}
     </div>
@@ -500,7 +501,7 @@ function renderApp(){
 
 function renderTopbar(title, subtitle, rightHtml){
   return `<div class="topbar">
-    <div><div class="title">${esc(title)}</div><div class="subtitle">${esc(subtitle||"")}</div></div>
+    <div class="topbar-title-row"><img src="logo.png" class="topbar-logo" alt=""/><div><div class="title">${esc(title)}</div><div class="subtitle">${esc(subtitle||"")}</div></div></div>
     <div class="topbar-right">${rightHtml}</div>
   </div>`;
 }
@@ -521,6 +522,10 @@ function cartItems(){
 }
 function cartCount(){ return cartItems().reduce((s,c)=>s+c.qty,0); }
 function cartTotal(){ return cartItems().reduce((s,c)=>s+c.qty*c.unitPrice,0); }
+const DELIVERY_THRESHOLD = 300;
+const DELIVERY_FEE = 10;
+function deliveryFee(){ return cartTotal() >= DELIVERY_THRESHOLD ? 0 : DELIVERY_FEE; }
+function grandTotal(){ return cartTotal() + deliveryFee(); }
 
 function productCard(p){
   const hasBox = p.boxPrice && p.boxPrice > 0;
@@ -740,7 +745,9 @@ function renderStore(){
           <div style="width:64px;text-align:right">${money(c.qty*c.unitPrice)}</div>
         </div>`).join("")}
       ${items.length>0? `
-        <div class="total-row"><span>Total</span><span>${money(cartTotal())}</span></div>
+        <div class="cart-row" style="border-bottom:none"><span class="cart-row-sub">Subtotal</span><span class="cart-row-sub">${money(cartTotal())}</span></div>
+        <div class="cart-row" style="border-bottom:none"><span class="cart-row-sub">Delivery</span><span class="cart-row-sub" style="${deliveryFee()===0?'color:var(--good)':''}">${deliveryFee()===0?"FREE":money(deliveryFee())}</span></div>
+        <div class="total-row"><span>Total</span><span>${money(grandTotal())}</span></div>
         <button class="primary-btn" data-act="gostore" data-val="checkout">Proceed to Checkout →</button>
       `:""}
     </div>`;
@@ -748,9 +755,11 @@ function renderStore(){
     body = `<div class="panel">
       <button class="back-link" data-act="navback">← Back to cart</button>
       <h2 class="panel-title">Checkout</h2>
-      <div class="total-row"><span>Order Total</span><span>${money(cartTotal())}</span></div>
+      <div class="cart-row" style="border-bottom:none"><span class="cart-row-sub">Subtotal</span><span class="cart-row-sub">${money(cartTotal())}</span></div>
+      <div class="cart-row" style="border-bottom:none"><span class="cart-row-sub">Delivery</span><span class="cart-row-sub" style="${deliveryFee()===0?'color:var(--good)':''}">${deliveryFee()===0?"FREE":money(deliveryFee())}</span></div>
+      <div class="total-row"><span>Order Total</span><span>${money(grandTotal())}</span></div>
       <p class="small-note" style="font-size:12px;color:var(--muted)">You'll enter shipping and card details on Stripe's secure payment page — nothing sensitive is handled by this app directly.</p>
-      <button class="primary-btn" id="pay-btn" data-act="stripepay">Pay ${money(cartTotal())} Securely</button>
+      <button class="primary-btn" id="pay-btn" data-act="stripepay">Pay ${money(grandTotal())} Securely</button>
     </div>`;
   } else if(STATE.storeScreen === "confirm" && STATE.lastOrder){
     const o = STATE.lastOrder;
@@ -852,7 +861,7 @@ function renderOrdersAdmin(){
           </select>
         </div>
         <div class="cart-row-sub">Ship to: ${esc(o.shipping.address)}, ${esc(o.shipping.city)}, ${esc(o.shipping.state)} ${esc(o.shipping.zip)} · ${esc(o.cardLast4)}</div>
-        <ul class="order-items">${o.items.map(it=>`<li>${it.qty} × ${esc(it.name)}${it.variantLabel?` (${esc(it.variantLabel)})`:""} — ${money(it.price*it.qty)}</li>`).join("")}</ul>
+        <ul class="order-items">${o.items.map(it=>`<li>${it.qty} × ${esc(it.name)}${it.variantLabel?` (${esc(it.variantLabel)})`:""} — ${money(it.price*it.qty)}</li>`).join("")}${o.deliveryFee!==undefined?`<li>Delivery — ${o.deliveryFee>0?money(o.deliveryFee):"FREE"}</li>`:""}</ul>
       </div>
     `).join("")}
   </div>`;
@@ -1207,9 +1216,9 @@ async function handleAction(e){
     .then(r=>r.json())
     .then(data=>{
       if(data.url) window.location.href = data.url;
-      else { flash(data.error || "Couldn't start checkout.","err"); btn.disabled=false; btn.textContent="Pay "+money(cartTotal())+" Securely"; }
+      else { flash(data.error || "Couldn't start checkout.","err"); btn.disabled=false; btn.textContent="Pay "+money(grandTotal())+" Securely"; }
     })
-    .catch(()=>{ flash("Couldn't reach the payment service.","err"); btn.disabled=false; btn.textContent="Pay "+money(cartTotal())+" Securely"; });
+    .catch(()=>{ flash("Couldn't reach the payment service.","err"); btn.disabled=false; btn.textContent="Pay "+money(grandTotal())+" Securely"; });
   }
 
   else if(act==="admintab"){ STATE.adminTab = val; STATE.productForm=null; render(); }

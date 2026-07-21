@@ -1,5 +1,5 @@
-const CACHE = "private-reserve-v28";
-const ASSETS = ["./", "./index.html", "./manifest.json", "./admin.html", "./admin-manifest.json", "./icon-192.png", "./icon-512.png", "./fonts/Boucherie_Block.ttf", "./fonts/Boucherie_Block.otf"];
+const CACHE = "private-reserve-v29";
+const ASSETS = ["./", "./index.html", "./manifest.json", "./admin.html", "./admin-manifest.json", "./icon-192.png", "./icon-512.png", "./fonts/Boucherie_Block.ttf", "./fonts/Boucherie_Block.otf", "./logo.png"];
 const PAGE_PATHS = ["/", "/index.html", "/admin.html"];
 
 self.addEventListener("install", (e) => {
