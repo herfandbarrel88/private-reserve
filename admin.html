@@ -393,6 +393,7 @@ let STATE = {
   lastOrder: null,
   toast: null,
   productForm: null, // editing product id or null
+  editingOriginKey: null, // origin currently being renamed, or null
 };
 if(!dbGet("pr_products", null)) dbSet("pr_products", SEED_PRODUCTS);
 if(!dbGet("pr_home_links", null)) dbSet("pr_home_links", DEFAULT_HOME_LINKS);
@@ -1009,10 +1010,21 @@ function renderCigarOriginsAdmin(){
     <h3 class="section-label" style="margin-top:26px">Existing Origins</h3>
     ${Object.entries(origins).map(([dictKey, o])=>`
       <div style="border:1px solid var(--border);border-radius:5px;padding:14px;margin-bottom:14px">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-          <div class="cart-row-name">${esc(o.label)}</div>
-          <button class="sm-btn" data-act="delorigin" data-val="${esc(dictKey)}">Delete Origin</button>
-        </div>
+        ${STATE.editingOriginKey === dictKey ? `
+          <div class="field"><label>Name (shown as "{name} Cigars")</label><input id="edit-origin-name-${esc(dictKey)}" value="${esc(o.key)}"/></div>
+          <div style="display:flex;gap:10px">
+            <button class="primary-btn" data-act="saveorigineditor" data-val="${esc(dictKey)}">Save</button>
+            <button class="ghost-btn" data-act="canceleditorigin">Cancel</button>
+          </div>
+        ` : `
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+            <div class="cart-row-name">${esc(o.label)}</div>
+            <div style="display:flex;gap:8px">
+              <button class="sm-btn" data-act="editorigin" data-val="${esc(dictKey)}">Edit</button>
+              <button class="sm-btn" data-act="delorigin" data-val="${esc(dictKey)}">Delete Origin</button>
+            </div>
+          </div>
+        `}
         ${originUsesBrands(dictKey) ? `
           <label style="display:flex;align-items:center;gap:8px;margin:12px 0;font-size:12px;color:var(--muted)">
             <input type="checkbox" data-act="togglelines" data-val="${esc(dictKey)}" ${o.hasLines?"checked":""}/>
@@ -1079,6 +1091,7 @@ const SHARED_MUTATING_ACTIONS = new Set([
   "saveproduct","delproduct","togglemember","geninvite","revokeinvite",
   "orderstatus","savehomelinks","addhomebox","delhomebox",
   "addorigin","delorigin","togglelines","addbrand","delbrand","savecigarbrands",
+  "saveorigineditor",
 ]);
 
 async function handleAction(e){
@@ -1337,6 +1350,27 @@ async function handleAction(e){
     STATE.cigarOrigins = next;
     setState({});
     flash("Origin deleted.");
+  }
+  else if(act==="editorigin"){ STATE.editingOriginKey = val; render(); }
+  else if(act==="canceleditorigin"){ STATE.editingOriginKey = null; render(); }
+  else if(act==="saveorigineditor"){
+    const input = document.getElementById(`edit-origin-name-${val}`);
+    const newName = input.value.trim();
+    if(!newName) return flash("Enter an origin name.","err");
+    const origin = STATE.cigarOrigins[val];
+    const oldKey = origin.key;
+    if(newName !== oldKey){
+      // Keep every product already tagged with the old name pointing at the new one.
+      STATE.products = STATE.products.map(p =>
+        (p.cigarOrigin||"").trim().toLowerCase() === oldKey.toLowerCase()
+          ? { ...p, cigarOrigin: newName }
+          : p
+      );
+    }
+    STATE.cigarOrigins = { ...STATE.cigarOrigins, [val]: { ...origin, key: newName, label: `${newName} Cigars` } };
+    STATE.editingOriginKey = null;
+    setState({});
+    flash("Origin updated.");
   }
   else if(act==="togglelines"){
     STATE.cigarOrigins = { ...STATE.cigarOrigins, [val]: { ...STATE.cigarOrigins[val], hasLines: el.checked } };
