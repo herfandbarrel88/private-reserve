@@ -12,6 +12,14 @@
 <meta name="apple-mobile-web-app-title" content="Private Reserve" />
 <meta name="theme-color" content="#161310" />
 <style>
+  @font-face{
+    font-family:"Boucherie Block";
+    src:url("fonts/Boucherie_Block.ttf") format("truetype"),
+        url("fonts/Boucherie_Block.otf") format("opentype");
+    font-weight:normal;
+    font-style:normal;
+    font-display:swap;
+  }
   :root{
     --bg:#161310; --surface:#1C1916; --surface2:#121110; --border:#2A2622; --border2:#332E28;
     --text:#EAE3D6; --muted:#93897C; --muted2:#6B6153; --gold:#C9A15C; --oxblood:#8B3A2F;
@@ -39,7 +47,7 @@
   .seal{width:52px;height:52px;border-radius:50%;border:1px solid var(--gold);color:var(--gold);
     display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;font-size:18px;
     letter-spacing:2px;margin:0 auto 14px;}
-  .gate-title{text-align:center;font-size:23px;letter-spacing:.5px;margin-bottom:6px;}
+  .gate-title{font-family:"Boucherie Block",Georgia,serif;text-align:center;font-size:26px;letter-spacing:.5px;margin-bottom:6px;}
   .gate-sub{text-align:center;font-size:12.5px;color:var(--muted);margin-bottom:22px;line-height:1.5;}
   .tab-row{display:flex;gap:4px;background:var(--surface2);border-radius:5px;padding:4px;margin-bottom:20px;}
   .tab-btn{flex:1;padding:8px 4px;background:transparent;border:none;color:var(--muted);font-size:11px;
@@ -62,7 +70,7 @@
   /* App shell */
   .topbar{display:flex;align-items:center;justify-content:space-between;padding:18px 16px;
     border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:5;}
-  .topbar .title{font-size:18px;}
+  .topbar .title{font-family:"Boucherie Block",Georgia,serif;font-size:20px;}
   .topbar .subtitle{font-size:11px;color:var(--muted);margin-top:2px;}
   .icon-btn{background:transparent;border:1px solid var(--border2);color:var(--text);border-radius:20px;
     width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:15px;}
@@ -91,8 +99,10 @@
   .home-links-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
   .home-link-box{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:0;
     overflow:hidden;text-align:left;color:var(--text);display:flex;flex-direction:column;}
-  .home-link-img{aspect-ratio:1/1;width:100%;display:flex;align-items:center;justify-content:center;background:var(--surface2);
-    color:#4A3A28;font-size:22px;overflow:hidden;}
+  .home-link-img{aspect-ratio:1/1;width:100%;display:flex;align-items:center;justify-content:center;background:var(--text);
+    color:#4A3A28;font-size:22px;overflow:hidden;padding:4px;}
+  .home-link-img img{border-radius:2px;}
+  .home-link-img:not(:has(img)){background:var(--surface2);padding:0;}
   .home-link-label{padding:10px 12px;font-family:Georgia,serif;font-size:14px;}
   .home-footer{text-align:center;font-size:12px;color:var(--muted);margin-top:26px;padding-top:16px;
     border-top:1px solid var(--border);}
@@ -108,8 +118,10 @@
     padding:13px;display:flex;flex-direction:column;}
   .p-badge{position:absolute;top:10px;right:10px;font-size:9px;color:#8B6A3E;text-transform:uppercase;
     letter-spacing:.4px;}
-  .p-img{aspect-ratio:1/1;width:100%;display:flex;align-items:center;justify-content:center;background:var(--surface2);
-    border-radius:4px;margin-bottom:10px;font-size:24px;color:#4A3A28;overflow:hidden;}
+  .p-img{aspect-ratio:1/1;width:100%;display:flex;align-items:center;justify-content:center;background:var(--text);
+    border-radius:4px;margin-bottom:10px;font-size:24px;color:#4A3A28;overflow:hidden;padding:4px;}
+  .p-img img{border-radius:2px;}
+  .p-img:not(:has(img)){background:var(--surface2);padding:0;}
   .p-title{font-size:13.5px;margin-bottom:4px;line-height:1.3;}
   .p-desc{font-size:10.5px;color:var(--muted);line-height:1.4;margin-bottom:8px;flex:1;}
   .p-foot{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
@@ -407,6 +419,30 @@ function flash(msg, kind){
 }
 function setState(patch){ Object.assign(STATE, patch); persist(); render(); }
 
+// Wires the phone/browser's native Back and Forward controls to the app's own
+// navigation (category, cigar drill-down, cart/checkout) instead of leaving the
+// site entirely. Forward moves push a new entry; our own "Back" buttons just
+// call history.back() so both native and in-app back stay in sync.
+function navSnapshot(){
+  return { category: STATE.category, cigarNav: STATE.cigarNav, storeScreen: STATE.storeScreen };
+}
+function pushNavState(){
+  try{ history.pushState(navSnapshot(), "", location.href); }catch(e){}
+}
+window.addEventListener("popstate", (e)=>{
+  if(!STATE.session) return; // gate screen has nothing to navigate
+  if(e.state){
+    STATE.category = e.state.category;
+    STATE.cigarNav = e.state.cigarNav;
+    STATE.storeScreen = e.state.storeScreen;
+  } else {
+    STATE.category = "Home";
+    STATE.cigarNav = { level: "root", originKey: null, brand: null, line: null };
+    STATE.storeScreen = "shop";
+  }
+  render();
+});
+
 /* ================= RENDER ================= */
 function render(){
   const root = document.getElementById("root");
@@ -508,7 +544,7 @@ function productCard(p){
     : singleControl;
   return `
     <div class="p-card">
-      <div class="p-img">${p.image?`<img src="${esc(p.image)}" style="width:100%;height:100%;object-fit:cover;border-radius:4px"/>`: (p.category==="Cigars"?"🚬":p.category==="Spirits"?"🥃":"📦")}</div>
+      <div class="p-img">${p.image?`<img src="${esc(p.image)}" style="width:100%;height:100%;object-fit:cover"/>`: (p.category==="Cigars"?"🚬":p.category==="Spirits"?"🥃":"📦")}</div>
       <div class="p-title">${esc(p.name)}</div>
       <div class="p-desc">${esc(p.description)}</div>
       <div class="p-foot">
@@ -535,7 +571,7 @@ function cigarBreadcrumb(){
     parts.push(`<span class="crumb-current">${esc(nav.line)}</span>`);
   }
   return `<div class="breadcrumb">
-    <button class="back-link" data-act="cigarback">← Back</button>
+    <button class="back-link" data-act="navback">← Back</button>
     <div class="crumb-row">${parts.join('<span class="crumb-sep">›</span>')}</div>
   </div>`;
 }
@@ -576,7 +612,7 @@ function renderCigarsPage(){
           ${byName(origin.brands).map(b=>{
             const img = (STATE.cigarBrandImages||{})[b] || "";
             return `<button class="home-link-box" data-act="cigarnav" data-val="brand" data-origin="${nav.originKey}" data-brand="${esc(b)}">
-              <div class="home-link-img">${img?`<img src="${esc(img)}" style="width:100%;height:100%;object-fit:cover;border-radius:4px"/>`:`<span class="p-img-fallback">🚬</span>`}</div>
+              <div class="home-link-img">${img?`<img src="${esc(img)}" style="width:100%;height:100%;object-fit:cover"/>`:`<span class="p-img-fallback">🚬</span>`}</div>
               <div class="home-link-label">${esc(b)}</div>
             </button>`;
           }).join("")}
@@ -603,7 +639,7 @@ function renderCigarsPage(){
         ${lines.map(line=>{
           const sample = brandCigars.find(p=>p.cigarLine===line);
           return `<button class="home-link-box" data-act="cigarnav" data-val="line" data-line="${esc(line)}">
-            <div class="home-link-img">${sample&&sample.image?`<img src="${esc(sample.image)}" style="width:100%;height:100%;object-fit:cover;border-radius:4px"/>`:`<span class="p-img-fallback">🚬</span>`}</div>
+            <div class="home-link-img">${sample&&sample.image?`<img src="${esc(sample.image)}" style="width:100%;height:100%;object-fit:cover"/>`:`<span class="p-img-fallback">🚬</span>`}</div>
             <div class="home-link-label">${esc(line)}</div>
           </button>`;
         }).join("") || `<div class="empty" style="grid-column:1/-1">No lines added for ${esc(nav.brand)} yet — add products in the Back Office and tag them with this brand.</div>`}
@@ -668,7 +704,7 @@ function renderStore(){
           const fallbackLabel = target.startsWith("category:") ? target.slice(9) : (l.label || "Shop");
           return `
           <button class="home-link-box" data-act="homelinkgo" data-target="${esc(target)}">
-            <div class="home-link-img">${l.image?`<img src="${esc(l.image)}" style="width:100%;height:100%;object-fit:cover;border-radius:4px"/>`:`<span class="p-img-fallback">+</span>`}</div>
+            <div class="home-link-img">${l.image?`<img src="${esc(l.image)}" style="width:100%;height:100%;object-fit:cover"/>`:`<span class="p-img-fallback">+</span>`}</div>
             <div class="home-link-label">${esc(l.label || fallbackLabel)}</div>
           </button>`;
         }).join("")}
@@ -691,7 +727,7 @@ function renderStore(){
   } else if(STATE.storeScreen === "cart"){
     const items = cartItems();
     body = `<div class="panel">
-      <button class="back-link" data-act="gostore" data-val="shop">← Continue shopping</button>
+      <button class="back-link" data-act="navback">← Continue shopping</button>
       <h2 class="panel-title">Your Cart</h2>
       ${items.length===0? `<div class="empty">Your cart is empty.</div>` : items.map(c=>`
         <div class="cart-row">
@@ -710,7 +746,7 @@ function renderStore(){
     </div>`;
   } else if(STATE.storeScreen === "checkout"){
     body = `<div class="panel">
-      <button class="back-link" data-act="gostore" data-val="cart">← Back to cart</button>
+      <button class="back-link" data-act="navback">← Back to cart</button>
       <h2 class="panel-title">Checkout</h2>
       <div class="total-row"><span>Order Total</span><span>${money(cartTotal())}</span></div>
       <p class="small-note" style="font-size:12px;color:var(--muted)">You'll enter shipping and card details on Stripe's secure payment page — nothing sensitive is handled by this app directly.</p>
@@ -1060,6 +1096,7 @@ async function handleAction(e){
       btn.disabled = false;
       if(!data.ok) return flash(data.error || "Couldn't sign in.", "err");
       setState({session:{type:"member", email:data.member.email, name:data.member.name}, storeScreen:"shop"});
+      try{ history.replaceState(navSnapshot(), "", location.href); }catch(err){}
       pullShared(false).then(()=>render());
     }).catch(()=>{ btn.disabled = false; flash("Couldn't reach the server. Try again.", "err"); });
   }
@@ -1077,6 +1114,7 @@ async function handleAction(e){
       btn.disabled = false;
       if(!data.ok) return flash(data.error || "Couldn't activate membership.", "err");
       setState({session:{type:"member", email:data.member.email, name:data.member.name}, storeScreen:"shop"});
+      try{ history.replaceState(navSnapshot(), "", location.href); }catch(err){}
       flash("Membership activated. Welcome in.");
       pullShared(false).then(()=>render());
     }).catch(()=>{ btn.disabled = false; flash("Couldn't reach the server. Try again.", "err"); });
@@ -1093,6 +1131,7 @@ async function handleAction(e){
       if(!data.ok) return flash(data.error || "Incorrect proprietor passcode.", "err");
       ADMIN_PASSCODE = pass;
       setState({session:{type:"admin"}, adminTab:"products"});
+      try{ history.replaceState(navSnapshot(), "", location.href); }catch(err){}
       pullShared(false).then(()=>render());
     }).catch(()=>{ btn.disabled = false; flash("Couldn't reach the server. Try again.", "err"); });
   }
@@ -1101,11 +1140,11 @@ async function handleAction(e){
 
   else if(act==="refresh"){ pullShared(true).then(()=>render()); }
 
-  else if(act==="gostore"){ STATE.storeScreen = val; render(); }
-  else if(act==="setcat"){ STATE.category = val; STATE.cigarNav = { level: "root", originKey: null, brand: null, line: null }; STATE.searchQuery = ""; render(); }
+  else if(act==="gostore"){ STATE.storeScreen = val; pushNavState(); render(); }
+  else if(act==="setcat"){ STATE.category = val; STATE.cigarNav = { level: "root", originKey: null, brand: null, line: null }; STATE.searchQuery = ""; pushNavState(); render(); }
   else if(act==="dosearch"){ STATE.searchQuery = document.getElementById("search-input").value.trim(); render(); }
   else if(act==="clearsearch"){ STATE.searchQuery = ""; render(); }
-  else if(act==="homelinkgo"){ resolveHomeLinkTarget(el.dataset.target); render(); }
+  else if(act==="homelinkgo"){ resolveHomeLinkTarget(el.dataset.target); pushNavState(); render(); }
 
   else if(act==="cigarnav"){
     const nav = STATE.cigarNav;
@@ -1122,20 +1161,10 @@ async function handleAction(e){
     } else if(val==="line"){
       STATE.cigarNav = { level: "products", originKey: nav.originKey, brand: nav.brand, line: el.dataset.line };
     }
+    pushNavState();
     render();
   }
-  else if(act==="cigarback"){
-    const nav = STATE.cigarNav;
-    const origin = nav.originKey ? STATE.cigarOrigins[nav.originKey] : null;
-    if(nav.level==="products" && nav.brand && origin && origin.hasLines){
-      STATE.cigarNav = { level: "brand", originKey: nav.originKey, brand: nav.brand, line: null };
-    } else if(nav.level==="products" || nav.level==="brand"){
-      STATE.cigarNav = { level: "origin", originKey: nav.originKey, brand: null, line: null };
-    } else {
-      STATE.cigarNav = { level: "root", originKey: null, brand: null, line: null };
-    }
-    render();
-  }
+  else if(act==="navback"){ history.back(); }
 
   else if(act==="addcart"){
     const p = STATE.products.find(pp=>pp.id===val);
@@ -1444,6 +1473,9 @@ async function boot(){
     flash("Checkout cancelled — your cart is still here.", "err");
   }
 
+  if(STATE.session){
+    try{ history.replaceState(navSnapshot(), "", location.href); }catch(e){}
+  }
   render();
 }
 boot();

@@ -1,5 +1,5 @@
-const CACHE = "private-reserve-v25";
-const ASSETS = ["./", "./index.html", "./manifest.json", "./admin.html", "./admin-manifest.json", "./icon-192.png", "./icon-512.png"];
+const CACHE = "private-reserve-v28";
+const ASSETS = ["./", "./index.html", "./manifest.json", "./admin.html", "./admin-manifest.json", "./icon-192.png", "./icon-512.png", "./fonts/Boucherie_Block.ttf", "./fonts/Boucherie_Block.otf"];
 const PAGE_PATHS = ["/", "/index.html", "/admin.html"];
 
 self.addEventListener("install", (e) => {
