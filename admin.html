@@ -67,17 +67,19 @@
   .msg.ok{background:#20301f;color:#a9d4ab;}
 
   /* App shell */
-  .topbar{display:flex;align-items:center;justify-content:space-between;padding:18px 16px;
-    border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:5;}
-  .topbar-title-row{display:flex;align-items:center;gap:10px;}
-  .topbar-logo{width:34px;height:34px;flex-shrink:0;}
-  .topbar .title{font-family:"Boucherie Block",Georgia,serif;font-size:20px;}
-  .topbar .subtitle{font-size:11px;color:var(--muted);margin-top:2px;}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;
+    border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:5;gap:8px;}
+  .topbar-title-row{display:flex;align-items:center;gap:8px;min-width:0;flex:1;}
+  .topbar-logo{width:28px;height:28px;flex-shrink:0;}
+  .topbar-title-text{min-width:0;}
+  .topbar .title{font-family:"Boucherie Block",Georgia,serif;font-size:16px;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis;}
+  .topbar .subtitle{font-size:10.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .icon-btn{background:transparent;border:1px solid var(--border2);color:var(--text);border-radius:20px;
-    width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:15px;}
-  .cart-btn{display:flex;align-items:center;gap:6px;background:var(--border2);border:none;color:var(--text);
-    border-radius:20px;padding:8px 14px;font-size:13px;}
-  .topbar-right{display:flex;align-items:center;gap:10px;}
+    width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
+  .cart-btn{display:flex;align-items:center;gap:5px;background:var(--border2);border:none;color:var(--text);
+    border-radius:20px;padding:7px 11px;font-size:12.5px;flex-shrink:0;}
+  .topbar-right{display:flex;align-items:center;gap:7px;flex-shrink:0;}
 
   .content{padding:24px 16px 16px;}
   .cat-row{display:flex;gap:8px;overflow-x:auto;margin-bottom:16px;padding-bottom:2px;}
@@ -501,7 +503,7 @@ function renderApp(){
 
 function renderTopbar(title, subtitle, rightHtml){
   return `<div class="topbar">
-    <div class="topbar-title-row"><img src="logo.png" class="topbar-logo" alt=""/><div><div class="title">${esc(title)}</div><div class="subtitle">${esc(subtitle||"")}</div></div></div>
+    <div class="topbar-title-row"><img src="logo.png" class="topbar-logo" alt=""/><div class="topbar-title-text"><div class="title">${esc(title)}</div><div class="subtitle">${esc(subtitle||"")}</div></div></div>
     <div class="topbar-right">${rightHtml}</div>
   </div>`;
 }

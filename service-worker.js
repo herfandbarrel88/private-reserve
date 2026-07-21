@@ -1,9 +1,13 @@
-const CACHE = "private-reserve-v29";
+const CACHE = "private-reserve-v30";
 const ASSETS = ["./", "./index.html", "./manifest.json", "./admin.html", "./admin-manifest.json", "./icon-192.png", "./icon-512.png", "./fonts/Boucherie_Block.ttf", "./fonts/Boucherie_Block.otf", "./logo.png"];
 const PAGE_PATHS = ["/", "/index.html", "/admin.html"];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
+  e.waitUntil(
+    caches.open(CACHE).then((c) =>
+      Promise.allSettled(ASSETS.map((asset) => c.add(asset)))
+    )
+  );
   self.skipWaiting();
 });
 
