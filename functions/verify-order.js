@@ -51,6 +51,7 @@ async function sendOrderEmail(order) {
           <p><strong>${order.orderNo}</strong> — $${order.total.toFixed(2)}</p>
           <p>From: ${order.memberName} (${order.memberEmail})</p>
           <ul>${itemsHtml}</ul>
+          <p>Delivery: ${order.deliveryFee > 0 ? "$" + order.deliveryFee.toFixed(2) : "FREE"}</p>
           <p>Shipping to: ${order.shipping.address}, ${order.shipping.city}, ${order.shipping.state} ${order.shipping.zip}</p>
         `,
       }),
@@ -110,6 +111,7 @@ exports.handler = async (event) => {
       memberEmail: session.metadata.memberEmail || session.customer_details?.email || "",
       memberName: session.metadata.memberName || "",
       items: orderItems,
+      deliveryFee: parseFloat(session.metadata.deliveryFee || "0"),
       total: (session.amount_total || 0) / 100,
       status: "Received",
       shipping,

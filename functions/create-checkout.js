@@ -30,18 +30,42 @@ exports.handler = async (event) => {
     const products = (rows[0] && rows[0].value) || [];
 
     const line_items = [];
+    const stockNeeded = {}; // productId -> total qty across variants, validated together
+    let subtotal = 0;
     for (const item of items) {
       const product = products.find((p) => p.id === item.id);
       if (!product) return { statusCode: 400, body: JSON.stringify({ error: `Product ${item.id} not found.` }) };
-      if (product.stock < item.qty) {
+      const isBox = item.variant === "box";
+      if (isBox && !(product.boxPrice && product.boxPrice > 0)) {
+        return { statusCode: 400, body: JSON.stringify({ error: `${product.name} has no box option.` }) };
+      }
+      const unitPrice = isBox ? Number(product.boxPrice) : product.price;
+      const variantLabel = isBox ? (product.boxLabel || "Box") : "Single";
+      stockNeeded[item.id] = (stockNeeded[item.id] || 0) + item.qty;
+      if (stockNeeded[item.id] > product.stock) {
         return { statusCode: 400, body: JSON.stringify({ error: `Not enough stock for ${product.name}.` }) };
       }
+      subtotal += unitPrice * item.qty;
       line_items.push({
         quantity: item.qty,
         price_data: {
           currency: "usd",
-          unit_amount: Math.round(product.price * 100),
-          product_data: { name: product.name, description: product.category },
+          unit_amount: Math.round(unitPrice * 100),
+          product_data: { name: `${product.name} (${variantLabel})`, description: product.category },
+        },
+      });
+    }
+
+    const DELIVERY_THRESHOLD = 300;
+    const DELIVERY_FEE = 10;
+    const deliveryFee = subtotal >= DELIVERY_THRESHOLD ? 0 : DELIVERY_FEE;
+    if (deliveryFee > 0) {
+      line_items.push({
+        quantity: 1,
+        price_data: {
+          currency: "usd",
+          unit_amount: Math.round(deliveryFee * 100),
+          product_data: { name: "Delivery", description: `Free on orders over $${DELIVERY_THRESHOLD}` },
         },
       });
     }
@@ -57,6 +81,7 @@ exports.handler = async (event) => {
         memberEmail: memberEmail || "",
         memberName: memberName || "",
         cart: JSON.stringify(items),
+        deliveryFee: deliveryFee.toFixed(2),
       },
     });
 
