@@ -892,7 +892,8 @@ function renderMembersAdmin(){
 function renderInvitesAdmin(){
   const list = Object.entries(STATE.invites).sort((a,b)=>(b[1].createdAt||0)-(a[1].createdAt||0));
   return `<div class="panel">
-    <button class="primary-btn" data-act="geninvite">🎟 Generate Invite Code</button>
+    <div class="field"><label>New invite code</label><input id="new-invite-code" style="letter-spacing:2px;text-transform:uppercase" placeholder="e.g. WELCOME2026"/></div>
+    <button class="primary-btn" data-act="addinvite">＋ Add Code</button>
     <h3 class="section-label" style="margin-top:22px">Codes (${list.length})</h3>
     ${list.length===0?`<div class="empty">No invite codes yet.</div>`:""}
     ${list.map(([code,info])=>`
@@ -1091,7 +1092,7 @@ function bindEvents(){
 }
 
 const SHARED_MUTATING_ACTIONS = new Set([
-  "saveproduct","delproduct","togglemember","geninvite","revokeinvite",
+  "saveproduct","delproduct","togglemember","addinvite","revokeinvite",
   "orderstatus","savehomelinks","addhomebox","delhomebox",
   "addorigin","delorigin","togglelines","addbrand","delbrand","savecigarbrands",
   "saveorigineditor",
@@ -1287,10 +1288,14 @@ async function handleAction(e){
     setState({});
   }
 
-  else if(act==="geninvite"){
-    const code = genCode();
+  else if(act==="addinvite"){
+    const input = document.getElementById("new-invite-code");
+    const code = (input ? input.value : "").trim().toUpperCase();
+    if(!code){ flash("Type a code first.", "err"); return; }
+    if(STATE.invites[code]){ flash("That code already exists.", "err"); return; }
     STATE.invites[code] = {used:false, createdAt:Date.now()};
     setState({});
+    flash("Code added: " + code);
   }
   else if(act==="revokeinvite"){
     delete STATE.invites[val];
