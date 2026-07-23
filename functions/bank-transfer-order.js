@@ -75,15 +75,6 @@ async function sendEnquiryEmail(order) {
             <p style="font-size:12px;color:#888">Payment by bank transfer.<br/>
             Items will be sent once funds have cleared.<br/>
             Any questions, call 0414790053.</p>
-
-            <div style="margin-top:30px;padding:14px;background:#f6f6f6;border-left:3px solid #C9A15C">
-              <p style="margin:0 0 6px;font-size:12px;font-weight:bold;color:#666">FOR YOU — DELETE BEFORE FORWARDING</p>
-              <p style="margin:0;font-size:12px;color:#666">
-                Contact: ${order.memberEmail} &middot; ${order.phone}<br/>
-                Stock has already been reduced for this order. If the customer does not go ahead,
-                add the stock back in the Back Office and mark the order Cancelled.
-              </p>
-            </div>
           </div>
         `,
       }),

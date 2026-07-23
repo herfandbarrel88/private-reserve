@@ -74,7 +74,6 @@ async function sendOrderEmail(order) {
             <hr style="border:none;border-top:1px solid #ddd;margin:22px 0 12px"/>
             <p style="font-size:12px;color:#888">Items will be sent once funds have cleared.<br/>
             Any questions, call 0414790053.</p>
-            <p style="font-size:11px;color:#bbb;margin-top:24px">Customer contact: ${order.memberEmail}</p>
           </div>
         `,
       }),
