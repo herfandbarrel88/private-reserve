@@ -782,7 +782,17 @@ function renderStore(){
       <div class="field"><label>Phone number</label><input id="bt-phone" type="tel" placeholder="04XX XXX XXX"/></div>
       <div class="field"><label>Delivery address</label><input id="bt-address" placeholder="Street address"/></div>
       <div class="field"><label>Suburb / City</label><input id="bt-city" placeholder="Suburb"/></div>
-      <div class="field"><label>State</label><input id="bt-state" placeholder="e.g. NSW"/></div>
+      <div class="field"><label>State</label><select id="bt-state">
+        <option value="">— select —</option>
+        <option value="NSW">NSW</option>
+        <option value="VIC">VIC</option>
+        <option value="QLD">QLD</option>
+        <option value="WA">WA</option>
+        <option value="SA">SA</option>
+        <option value="TAS">TAS</option>
+        <option value="ACT">ACT</option>
+        <option value="NT">NT</option>
+      </select></div>
       <div class="field"><label>Postcode</label><input id="bt-zip" placeholder="e.g. 2000"/></div>
       <button class="primary-btn" id="bt-btn" data-act="submitbanktransfer">Submit Request</button>
     </div>`;
@@ -881,7 +891,7 @@ function renderProductsAdmin(){
 }
 
 function renderOrdersAdmin(){
-  const statuses = ["Awaiting payment","Received","Processing","Shipped","Delivered","Cancelled"];
+  const statuses = ["Awaiting payment","Received","Processing","Shipped","Delivered","Cancelled — delete order"];
   return `<div class="panel">
     <h3 class="section-label">Orders (${STATE.orders.length})</h3>
     ${STATE.orders.length===0?`<div class="empty">No orders yet.</div>`:""}
@@ -912,6 +922,7 @@ function renderMembersAdmin(){
         <div class="flex1">${new Date(m.joinedAt).toLocaleDateString()}</div>
         <div class="flex1" style="color:${m.active?'var(--good)':'var(--bad)'}">${m.active?"Active":"Suspended"}</div>
         <button class="sm-btn" data-act="togglemember" data-val="${esc(m.email)}">${m.active?"Suspend":"Reinstate"}</button>
+        <button class="sm-btn" data-act="delmember" data-val="${esc(m.email)}" style="color:var(--bad);border-color:var(--bad)">Delete</button>
       </div>
     `).join("")}
   </div>`;
@@ -1120,7 +1131,7 @@ function bindEvents(){
 }
 
 const SHARED_MUTATING_ACTIONS = new Set([
-  "saveproduct","delproduct","togglemember","addinvite","revokeinvite",
+  "saveproduct","delproduct","togglemember","delmember","addinvite","revokeinvite",
   "orderstatus","savehomelinks","addhomebox","delhomebox",
   "addorigin","delorigin","togglelines","addbrand","delbrand","savecigarbrands",
   "saveorigineditor",
@@ -1343,6 +1354,22 @@ async function handleAction(e){
 
   else if(act==="orderstatus"){
     const id = el.dataset.val, status = el.value;
+    if(status==="Cancelled — delete order"){
+      const order = STATE.orders.find(o=>o.id===id);
+      if(!confirm("Cancelling deletes this order permanently and puts the stock back. This can't be undone.\n\nContinue?")){
+        render(); // reset the dropdown to its previous value
+        return;
+      }
+      if(order && order.items){
+        STATE.products = STATE.products.map(p=>{
+          const qty = order.items.filter(it=>it.id===p.id).reduce((s,it)=>s+it.qty,0);
+          return qty>0 ? {...p, stock:(p.stock||0)+qty} : p;
+        });
+      }
+      STATE.orders = STATE.orders.filter(o=>o.id!==id);
+      setState({}); flash("Order deleted and stock returned.");
+      return;
+    }
     STATE.orders = STATE.orders.map(o=>o.id===id?{...o,status}:o);
     setState({});
   }
@@ -1351,6 +1378,14 @@ async function handleAction(e){
     const email = val;
     STATE.members[email] = {...STATE.members[email], active: !STATE.members[email].active};
     setState({});
+  }
+
+  else if(act==="delmember"){
+    const m = STATE.members[val];
+    if(!m) return;
+    if(!confirm(`Permanently delete ${m.name} (${val})?\n\nThey will lose access and this can't be undone.`)) return;
+    delete STATE.members[val];
+    setState({}); flash("Member deleted.");
   }
 
   else if(act==="addinvite"){
