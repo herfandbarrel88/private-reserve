@@ -764,8 +764,36 @@ function renderStore(){
       <div class="cart-row" style="border-bottom:none"><span class="cart-row-sub">Subtotal</span><span class="cart-row-sub">${money(cartTotal())}</span></div>
       <div class="cart-row" style="border-bottom:none"><span class="cart-row-sub">Delivery</span><span class="cart-row-sub" style="${deliveryFee()===0?'color:var(--good)':''}">${deliveryFee()===0?"FREE":money(deliveryFee())}</span></div>
       <div class="total-row"><span>Order Total</span><span>${money(grandTotal())}</span></div>
+      <p class="small-note" style="font-size:12px;color:var(--muted);margin-top:14px"><strong>Items will be sent once funds have cleared.</strong></p>
+      <h3 class="section-label" style="margin-top:18px">Choose how to pay</h3>
+      <button class="primary-btn" id="pay-btn" data-act="stripepay">Pay ${money(grandTotal())} by Card</button>
       <p class="small-note" style="font-size:12px;color:var(--muted)">You'll enter shipping and card details on Stripe's secure payment page — nothing sensitive is handled by this app directly.</p>
-      <button class="primary-btn" id="pay-btn" data-act="stripepay">Pay ${money(grandTotal())} Securely</button>
+      <button class="primary-btn" style="margin-top:10px;background:transparent;border:1px solid var(--gold);color:var(--gold)" data-act="gostore" data-val="banktransfer">Pay by Bank Transfer</button>
+      <p class="small-note" style="font-size:12px;color:var(--muted)">We'll contact you to arrange payment.</p>
+    </div>`;
+  } else if(STATE.storeScreen === "banktransfer"){
+    body = `<div class="panel">
+      <button class="back-link" data-act="navback">← Back to checkout</button>
+      <h2 class="panel-title">Pay by Bank Transfer</h2>
+      <div class="total-row"><span>Order Total</span><span>${money(grandTotal())}</span></div>
+      <p class="small-note" style="font-size:12px;color:var(--muted)">Leave your details below and we'll contact you to arrange payment. <strong>Items will be sent once funds have cleared.</strong></p>
+      <div class="field"><label>Full name</label><input id="bt-name" value="${esc(s_name())}" placeholder="Your name"/></div>
+      <div class="field"><label>Email</label><input id="bt-email" type="email" value="${esc(STATE.session&&STATE.session.email?STATE.session.email:"")}" placeholder="you@example.com"/></div>
+      <div class="field"><label>Phone number</label><input id="bt-phone" type="tel" placeholder="04XX XXX XXX"/></div>
+      <div class="field"><label>Delivery address</label><input id="bt-address" placeholder="Street address"/></div>
+      <div class="field"><label>Suburb / City</label><input id="bt-city" placeholder="Suburb"/></div>
+      <div class="field"><label>State</label><input id="bt-state" placeholder="e.g. NSW"/></div>
+      <div class="field"><label>Postcode</label><input id="bt-zip" placeholder="e.g. 2000"/></div>
+      <button class="primary-btn" id="bt-btn" data-act="submitbanktransfer">Submit Request</button>
+    </div>`;
+  } else if(STATE.storeScreen === "btconfirm" && STATE.lastOrder){
+    const o = STATE.lastOrder;
+    body = `<div class="panel">
+      <h2 class="panel-title">✓ Request Received</h2>
+      <p class="cart-row-sub">Order <strong>${esc(o.orderNo)}</strong> — ${money(o.total)}.<br/><br/>
+      Thanks ${esc(o.memberName)}. We'll contact you shortly on <strong>${esc(o.phone)}</strong> or <strong>${esc(o.memberEmail)}</strong> to arrange payment.<br/><br/>
+      <strong>Items will be sent once funds have cleared.</strong></p>
+      <button class="primary-btn" data-act="gostore" data-val="shop">Back to Shop</button>
     </div>`;
   } else if(STATE.storeScreen === "confirm" && STATE.lastOrder){
     const o = STATE.lastOrder;
@@ -853,15 +881,15 @@ function renderProductsAdmin(){
 }
 
 function renderOrdersAdmin(){
-  const statuses = ["Received","Processing","Shipped","Delivered","Cancelled"];
+  const statuses = ["Awaiting payment","Received","Processing","Shipped","Delivered","Cancelled"];
   return `<div class="panel">
     <h3 class="section-label">Orders (${STATE.orders.length})</h3>
     ${STATE.orders.length===0?`<div class="empty">No orders yet.</div>`:""}
     ${STATE.orders.map(o=>`
       <div class="order-card">
         <div class="order-head">
-          <div><div class="cart-row-name">${esc(o.orderNo)} — ${money(o.total)}</div>
-          <div class="cart-row-sub">${esc(o.memberName)} (${esc(o.memberEmail)}) · ${new Date(o.createdAt).toLocaleString()}</div></div>
+          <div><div class="cart-row-name">${esc(o.orderNo)} — ${money(o.total)}${o.paymentMethod==="Bank transfer"?` <span style="color:var(--gold);font-size:12px">· BANK TRANSFER</span>`:""}</div>
+          <div class="cart-row-sub">${esc(o.memberName)} (${esc(o.memberEmail)})${o.phone?` · ${esc(o.phone)}`:""} · ${new Date(o.createdAt).toLocaleString()}</div></div>
           <select data-act="orderstatus" data-val="${o.id}" style="width:140px">
             ${statuses.map(st=>`<option ${o.status===st?'selected':''}>${st}</option>`).join("")}
           </select>
@@ -1235,9 +1263,46 @@ async function handleAction(e){
     .then(r=>r.json())
     .then(data=>{
       if(data.url) window.location.href = data.url;
-      else { flash(data.error || "Couldn't start checkout.","err"); btn.disabled=false; btn.textContent="Pay "+money(grandTotal())+" Securely"; }
+      else { flash(data.error || "Couldn't start checkout.","err"); btn.disabled=false; btn.textContent="Pay "+money(grandTotal())+" by Card"; }
     })
-    .catch(()=>{ flash("Couldn't reach the payment service.","err"); btn.disabled=false; btn.textContent="Pay "+money(grandTotal())+" Securely"; });
+    .catch(()=>{ flash("Couldn't reach the payment service.","err"); btn.disabled=false; btn.textContent="Pay "+money(grandTotal())+" by Card"; });
+  }
+
+  else if(act==="submitbanktransfer"){
+    const items = cartItems();
+    if(items.length===0) return flash("Your cart is empty.","err");
+    const g = id => (document.getElementById(id)?document.getElementById(id).value:"").trim();
+    const name=g("bt-name"), email=g("bt-email"), phone=g("bt-phone");
+    const address=g("bt-address"), city=g("bt-city"), state=g("bt-state"), zip=g("bt-zip");
+    if(!name||!email||!phone) return flash("Please fill in your name, email and phone.","err");
+    if(!address||!city||!state||!zip) return flash("Please fill in your full delivery address.","err");
+    const btn = document.getElementById("bt-btn"); btn.disabled=true; btn.textContent="Sending…";
+    fetch("/.netlify/functions/bank-transfer-order", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({
+        items: items.map(c=>({id:c.product.id, variant:c.variant, qty:c.qty})),
+        memberEmail: email,
+        memberName: name,
+        phone,
+        shipping: {address, city, state, zip},
+      }),
+    })
+    .then(r=>r.json())
+    .then(data=>{
+      if(data.ok && data.order){
+        STATE.cart = {};
+        STATE.lastOrder = data.order;
+        STATE.storeScreen = "btconfirm";
+        pushNavState();
+        render();
+        pullShared(false); // pick up the stock this request just reduced
+      } else {
+        flash(data.error || "Couldn't submit your request.","err");
+        btn.disabled=false; btn.textContent="Submit Request";
+      }
+    })
+    .catch(()=>{ flash("Couldn't reach the server. Please try again.","err"); btn.disabled=false; btn.textContent="Submit Request"; });
   }
 
   else if(act==="admintab"){ STATE.adminTab = val; STATE.productForm=null; render(); }
