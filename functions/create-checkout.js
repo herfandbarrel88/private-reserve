@@ -49,7 +49,7 @@ exports.handler = async (event) => {
       line_items.push({
         quantity: item.qty,
         price_data: {
-          currency: "usd",
+          currency: "aud",
           unit_amount: Math.round(unitPrice * 100),
           product_data: { name: `${product.name} (${variantLabel})`, description: product.category },
         },
@@ -63,7 +63,7 @@ exports.handler = async (event) => {
       line_items.push({
         quantity: 1,
         price_data: {
-          currency: "usd",
+          currency: "aud",
           unit_amount: Math.round(deliveryFee * 100),
           product_data: { name: "Delivery", description: `Free on orders over $${DELIVERY_THRESHOLD}` },
         },
