@@ -33,9 +33,6 @@ const OWNER_EMAIL = "herfandbarrel@gmail.com";
 async function sendOrderEmail(order) {
   if (!process.env.RESEND_API_KEY) return; // silently skip if not configured yet
   try {
-    const itemsHtml = order.items.map(
-      (it) => `<li>${it.qty} × ${it.name}${it.variantLabel?` (${it.variantLabel})`:""} — $${(it.price * it.qty).toFixed(2)}</li>`
-    ).join("");
     await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -45,14 +42,40 @@ async function sendOrderEmail(order) {
       body: JSON.stringify({
         from: "The Private Reserve <onboarding@resend.dev>",
         to: [OWNER_EMAIL],
-        subject: `New order ${order.orderNo} — $${order.total.toFixed(2)}`,
+        subject: `Order ${order.orderNo} — $${order.total.toFixed(2)} — ${order.memberName}`,
         html: `
-          <h2>New order received</h2>
-          <p><strong>${order.orderNo}</strong> — $${order.total.toFixed(2)}</p>
-          <p>From: ${order.memberName} (${order.memberEmail})</p>
-          <ul>${itemsHtml}</ul>
-          <p>Delivery: ${order.deliveryFee > 0 ? "$" + order.deliveryFee.toFixed(2) : "FREE"}</p>
-          <p>Shipping to: ${order.shipping.address}, ${order.shipping.city}, ${order.shipping.state} ${order.shipping.zip}</p>
+          <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;color:#222">
+            <h1 style="margin:0 0 4px;font-size:22px;letter-spacing:1px">THE PRIVATE RESERVE</h1>
+            <p style="margin:0 0 18px;color:#777;font-size:13px">0414790053</p>
+            <hr style="border:none;border-top:1px solid #ddd;margin:0 0 18px"/>
+            <p style="font-size:15px">Hi ${order.memberName}, thank you for your order.</p>
+            <p style="font-size:13px;color:#555">Order <strong>${order.orderNo}</strong> &middot; ${new Date(order.createdAt).toLocaleDateString("en-AU")}</p>
+            <table style="width:100%;border-collapse:collapse;margin:18px 0;font-size:14px">
+              ${order.items.map((it) => `
+                <tr>
+                  <td style="padding:8px 0;border-bottom:1px solid #eee">
+                    ${it.qty} &times; ${it.name}${it.variantLabel ? ` <span style="color:#888">(${it.variantLabel})</span>` : ""}
+                  </td>
+                  <td style="padding:8px 0;border-bottom:1px solid #eee;text-align:right;white-space:nowrap">
+                    $${(it.price * it.qty).toFixed(2)}
+                  </td>
+                </tr>`).join("")}
+              <tr>
+                <td style="padding:8px 0;border-bottom:1px solid #eee;color:#555">Delivery</td>
+                <td style="padding:8px 0;border-bottom:1px solid #eee;text-align:right">${order.deliveryFee > 0 ? "$" + order.deliveryFee.toFixed(2) : "FREE"}</td>
+              </tr>
+              <tr>
+                <td style="padding:12px 0;font-weight:bold;font-size:16px">Total</td>
+                <td style="padding:12px 0;text-align:right;font-weight:bold;font-size:16px">$${order.total.toFixed(2)} AUD</td>
+              </tr>
+            </table>
+            <p style="font-size:13px;color:#555;margin-bottom:4px"><strong>Delivery address</strong></p>
+            <p style="font-size:14px;margin-top:0">${order.shipping.address}<br/>${order.shipping.city} ${order.shipping.state} ${order.shipping.zip}</p>
+            <hr style="border:none;border-top:1px solid #ddd;margin:22px 0 12px"/>
+            <p style="font-size:12px;color:#888">Items will be sent once funds have cleared.<br/>
+            Any questions, call 0414790053.</p>
+            <p style="font-size:11px;color:#bbb;margin-top:24px">Customer contact: ${order.memberEmail}</p>
+          </div>
         `,
       }),
     });
