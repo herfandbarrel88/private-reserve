@@ -408,13 +408,22 @@ const money = n => "$" + Number(n).toFixed(2);
 const byName = arr => arr.slice().sort((a,b)=>a.localeCompare(b, undefined, {sensitivity:"base", numeric:true}));
 const productsByName = arr => arr.slice().sort((a,b)=>a.name.localeCompare(b.name, undefined, {sensitivity:"base", numeric:true}));
 
+// Photos picked in the admin live here until they're saved. A hidden input alone
+// isn't safe: any render() (a toast appearing or clearing, a background refresh)
+// rebuilds the form from STATE and throws the pending upload away. Keeping it in
+// a plain object outside the DOM means a redraw can't lose it.
+const PENDING_IMAGES = {};
+
 function imageField(hiddenId, currentValue, label){
+  const pending = PENDING_IMAGES[hiddenId];
+  const val = (pending !== undefined) ? pending : (currentValue || "");
   return `
     <div class="field">
       <label>${esc(label)}</label>
       <input type="file" accept="image/*" data-img-target="${hiddenId}"/>
-      <input type="hidden" id="${hiddenId}" value="${esc(currentValue||'')}"/>
-      <div class="img-preview" id="${hiddenId}-preview">${currentValue?`<img src="${esc(currentValue)}"/>`:""}</div>
+      <input type="hidden" id="${hiddenId}" value="${esc(val)}"/>
+      <div class="img-preview" id="${hiddenId}-preview">${val?`<img src="${esc(val)}"/>`:""}</div>
+      ${pending!==undefined?`<div style="font-size:11px;color:var(--gold);margin-top:4px">New photo ready — press Save to keep it.</div>`:""}
     </div>`;
 }
 
@@ -438,9 +447,11 @@ function handleImageFile(e){
       canvas.width = w; canvas.height = h;
       canvas.getContext("2d").drawImage(img, 0, 0, w, h);
       const dataUrl = canvas.toDataURL("image/jpeg", 0.72);
+      PENDING_IMAGES[targetId] = dataUrl;   // survives any re-render until saved
       const hidden = document.getElementById(targetId);
       if(hidden) hidden.value = dataUrl;
-      if(preview) preview.innerHTML = `<img src="${dataUrl}"/>`;
+      const pv = document.getElementById(targetId+"-preview");
+      if(pv) pv.innerHTML = `<img src="${dataUrl}"/>`;
     };
     img.onerror = function(){ if(preview) preview.innerHTML = `<span style="font-size:11px;color:var(--bad)">Couldn't read that photo.</span>`; };
     img.src = ev.target.result;
@@ -1299,19 +1310,22 @@ function readHomePageForm(){
   const slides = [];
   for(let i=0; i<slideCount; i++){
     const g = f => { const el = document.querySelector(`[data-hs-field="${f}"][data-hs-index="${i}"]`); return el ? el.value.trim() : ""; };
-    const imgEl = document.getElementById(`hs-img-${i}`);
+    const key = `hs-img-${i}`;
+    const imgEl = document.getElementById(key);
+    const img = (PENDING_IMAGES[key] !== undefined) ? PENDING_IMAGES[key] : (imgEl ? imgEl.value.trim() : "");
     slides.push({ eyebrow:g("eyebrow"), heading:g("heading"), sub:g("sub"), btn:g("btn"),
-                  target:g("target"), image: imgEl ? imgEl.value.trim() : "" });
+                  target:g("target"), image: img });
   }
   const links = [];
   for(let i=0; i<4; i++){
     const labelEl  = document.querySelector(`[data-hl-field="label"][data-hl-index="${i}"]`);
     const targetEl = document.querySelector(`[data-hl-field="target"][data-hl-index="${i}"]`);
-    const imgEl    = document.getElementById(`hl-img-${i}`);
+    const key      = `hl-img-${i}`;
+    const imgEl    = document.getElementById(key);
     if(!labelEl && !imgEl) continue;
     links.push({
       label:  labelEl  ? labelEl.value.trim()  : "",
-      image:  imgEl    ? imgEl.value.trim()    : "",
+      image:  (PENDING_IMAGES[key] !== undefined) ? PENDING_IMAGES[key] : (imgEl ? imgEl.value.trim() : ""),
       target: targetEl ? targetEl.value        : "",
     });
   }
@@ -1329,7 +1343,7 @@ function readProductForm(){
     stock: parseInt(g("pf-stock"),10)||0,
     boxPriceRaw: g("pf-boxprice").trim(),
     boxLabel: g("pf-boxlabel").trim(),
-    image: g("pf-img").trim(),
+    image: (PENDING_IMAGES["pf-img"] !== undefined) ? PENDING_IMAGES["pf-img"] : g("pf-img").trim(),
     description: g("pf-desc").trim(),
     cigarOrigin: g("pf-origin").trim(),
     cigarBrand: g("pf-brand"),
@@ -1530,8 +1544,8 @@ async function handleAction(e){
 
   else if(act==="admintab"){ STATE.adminTab = val; STATE.productForm=null; render(); }
 
-  else if(act==="editproduct"){ STATE.productForm = val; render(); }
-  else if(act==="canceledit"){ STATE.productForm = null; render(); }
+  else if(act==="editproduct"){ delete PENDING_IMAGES["pf-img"]; STATE.productForm = val; render(); }
+  else if(act==="canceledit"){ delete PENDING_IMAGES["pf-img"]; STATE.productForm = null; render(); }
   else if(act==="delproduct"){
     if(!confirm("Delete this product? This can't be undone.")) return;
     STATE.products = STATE.products.filter(p=>p.id!==val);
@@ -1553,6 +1567,7 @@ async function handleAction(e){
       STATE.products = [{id:genId("prod"),name,category,price,stock,boxPrice,boxLabel,image,description,cigarOrigin,cigarBrand,cigarLine}, ...STATE.products];
       flash("Product added.");
     }
+    delete PENDING_IMAGES["pf-img"];
     STATE.productForm = null;
     setState({});
   }
@@ -1631,6 +1646,7 @@ async function handleAction(e){
     if(snap.slides.length) STATE.heroSlides = snap.slides;
     if(snap.links.length)  STATE.homeLinks  = snap.links;
     if(STATE.heroIndex >= STATE.heroSlides.length) STATE.heroIndex = 0;
+    Object.keys(PENDING_IMAGES).forEach(k=>{ if(k.startsWith("hl-img-")||k.startsWith("hs-img-")) delete PENDING_IMAGES[k]; });
     setState({});
     flash("Home page updated.");
   }
