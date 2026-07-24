@@ -113,6 +113,44 @@
   .home-footer{text-align:center;font-size:12px;color:var(--muted);margin-top:26px;padding-top:16px;
     border-top:1px solid var(--border);}
 
+  /* --- Home: promo bar --- */
+  .promo-bar{background:linear-gradient(90deg,#241d14,#332818,#241d14);border:1px solid var(--border);
+    border-radius:6px;padding:9px 12px;text-align:center;font-family:'Montserrat',sans-serif;
+    font-size:11px;font-weight:600;letter-spacing:.6px;color:var(--gold);margin-bottom:14px;}
+
+  /* --- Home: hero slider --- */
+  .hero{position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden;
+    background:linear-gradient(135deg,#1d1710 0%,#2a2118 55%,#181310 100%);margin-bottom:16px;min-height:230px;
+    display:flex;align-items:center;}
+  .hero-bg{position:absolute;inset:0;}
+  .hero-bg img{width:100%;height:100%;object-fit:cover;opacity:.5;}
+  .hero-bg::after{content:"";position:absolute;inset:0;
+    background:linear-gradient(90deg,rgba(22,19,16,.94) 0%,rgba(22,19,16,.72) 55%,rgba(22,19,16,.4) 100%);}
+  .hero-inner{position:relative;padding:26px 22px 40px;max-width:78%;}
+  .hero-eyebrow{display:flex;align-items:center;gap:9px;font-family:'Montserrat',sans-serif;font-size:10.5px;
+    font-weight:600;letter-spacing:2px;color:var(--gold);margin-bottom:10px;}
+  .hero-rule{display:inline-block;width:26px;height:1px;background:var(--gold);opacity:.7;}
+  .hero-heading{font-family:"Boucherie Block",Georgia,serif;font-size:30px;line-height:1.1;
+    margin:0 0 10px;color:var(--text);letter-spacing:.5px;}
+  .hero-sub{font-family:'Montserrat',sans-serif;font-size:13px;color:var(--muted);margin:0 0 16px;line-height:1.5;}
+  .hero-btn{background:var(--gold);color:#1a140c;border:none;border-radius:4px;padding:11px 20px;
+    font-family:'Montserrat',sans-serif;font-size:12px;font-weight:700;letter-spacing:1.2px;
+    text-transform:uppercase;cursor:pointer;}
+  .hero-dots{position:absolute;bottom:14px;left:0;right:0;display:flex;justify-content:center;gap:8px;}
+  .hero-dot{width:8px;height:8px;border-radius:50%;border:none;padding:0;cursor:pointer;
+    background:rgba(201,161,92,.32);}
+  .hero-dot.active{background:var(--gold);}
+
+  /* --- Home: info strip --- */
+  .info-strip{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);
+    border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:16px;}
+  .info-box{background:var(--surface);padding:16px 12px;text-align:center;}
+  .info-icon{font-size:19px;color:var(--gold);margin-bottom:6px;line-height:1;}
+  .info-title{font-family:'Montserrat',sans-serif;font-size:11px;font-weight:700;letter-spacing:.7px;
+    text-transform:uppercase;color:var(--text);margin-bottom:4px;}
+  .info-sub{font-family:'Montserrat',sans-serif;font-size:10.5px;color:var(--muted);line-height:1.45;}
+  @media(min-width:640px){ .info-strip{grid-template-columns:repeat(4,1fr);} .hero-heading{font-size:36px;} }
+
   .breadcrumb{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
   .crumb-row{display:flex;flex-wrap:wrap;align-items:center;gap:4px;font-size:12px;}
   .crumb-btn{background:none;border:none;color:var(--gold);padding:2px 0;font-size:12px;}
@@ -227,7 +265,7 @@ const SEED_PRODUCTS = [
 
 const SUPABASE_URL = "https://njlrcamdlghcvzkwpbff.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qbHJjYW1kbGdoY3Z6a3dwYmZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1Nzg5MjIsImV4cCI6MjA5OTE1NDkyMn0.ul4nyNg2Lbwl3LKJ2qW6ogOw_xkgNYRwuAApOHO8CKI";
-const SHARED_KEYS = ["pr_products","pr_members","pr_invites","pr_orders","pr_home_links","pr_cigar_brand_images","pr_cigar_origins"];
+const SHARED_KEYS = ["pr_products","pr_members","pr_invites","pr_orders","pr_home_links","pr_hero_slides","pr_cigar_brand_images","pr_cigar_origins"];
 
 function sbHeaders(extra){
   return Object.assign({
@@ -267,6 +305,7 @@ async function pushShared(){
       pr_invites: STATE.invites,
       pr_orders: STATE.orders,
       pr_home_links: STATE.homeLinks,
+      pr_hero_slides: STATE.heroSlides,
       pr_cigar_brand_images: STATE.cigarBrandImages,
       pr_cigar_origins: STATE.cigarOrigins,
     };
@@ -282,6 +321,7 @@ async function pushShared(){
     dbSet("pr_products", STATE.products); dbSet("pr_members", STATE.members);
     dbSet("pr_invites", STATE.invites); dbSet("pr_orders", STATE.orders);
     dbSet("pr_home_links", STATE.homeLinks);
+    dbSet("pr_hero_slides", STATE.heroSlides);
     dbSet("pr_cigar_brand_images", STATE.cigarBrandImages); dbSet("pr_cigar_origins", STATE.cigarOrigins);
   }catch(e){
     console.error("sync failed", e);
@@ -296,11 +336,13 @@ async function pullShared(showFlash){
     if(remote.pr_invites) STATE.invites = remote.pr_invites;
     if(remote.pr_orders) STATE.orders = remote.pr_orders;
     if(remote.pr_home_links) STATE.homeLinks = remote.pr_home_links;
+    if(remote.pr_hero_slides) STATE.heroSlides = remote.pr_hero_slides;
     if(remote.pr_cigar_brand_images) STATE.cigarBrandImages = remote.pr_cigar_brand_images;
     if(remote.pr_cigar_origins) STATE.cigarOrigins = remote.pr_cigar_origins;
     dbSet("pr_products", STATE.products); dbSet("pr_members", STATE.members);
     dbSet("pr_invites", STATE.invites); dbSet("pr_orders", STATE.orders);
     dbSet("pr_home_links", STATE.homeLinks);
+    dbSet("pr_hero_slides", STATE.heroSlides);
     dbSet("pr_cigar_brand_images", STATE.cigarBrandImages); dbSet("pr_cigar_origins", STATE.cigarOrigins);
     if(showFlash) flash("Refreshed.");
     return true;
@@ -368,10 +410,19 @@ const DEFAULT_HOME_LINKS = [
   { image: "", label: "Spirits", category: "Spirits" },
   { image: "", label: "Accessories", category: "Accessories" },
   { image: "", label: "", target: "" },
-  { image: "", label: "", target: "" },
-  { image: "", label: "", target: "" },
-  { image: "", label: "", target: "" },
-  { image: "", label: "", target: "" },
+];
+
+const DEFAULT_HERO_SLIDES = [
+  { eyebrow: "PREMIUM CIGARS", heading: "Elevate Your Experience.", sub: "Hand selected. Expertly curated. Exclusively for you.", btn: "Shop Cigars", target: "category:Cigars", image: "" },
+  { eyebrow: "FINE SPIRITS", heading: "The Perfect Pairing.", sub: "Rare pours to match every smoke.", btn: "Shop Spirits", target: "category:Spirits", image: "" },
+  { eyebrow: "THE DETAILS", heading: "Finish In Style.", sub: "Cutters, lighters and humidors.", btn: "Shop Accessories", target: "category:Accessories", image: "" },
+];
+
+const INFO_BOXES = [
+  { icon: "🚚", title: "Free Delivery", sub: "On orders over $300 Australia wide." },
+  { icon: "✓",  title: "Authentic Guaranteed", sub: "100% genuine products." },
+  { icon: "★",  title: "Premium Quality", sub: "Hand selected by cigar experts." },
+  { icon: "🔒", title: "Secure Payments", sub: "Safe & encrypted checkout." },
 ];
 
 let ADMIN_PASSCODE = null; // held in memory only for this session, never persisted — authorizes writes
@@ -383,6 +434,8 @@ let STATE = {
   orders: dbGet("pr_orders", []),
   adminPass: dbGet("pr_admin_pass", "humidor21"),
   homeLinks: dbGet("pr_home_links", null) || DEFAULT_HOME_LINKS,
+  heroSlides: dbGet("pr_hero_slides", null) || DEFAULT_HERO_SLIDES,
+  heroIndex: 0,
   cigarBrandImages: dbGet("pr_cigar_brand_images", {}),
   cigarOrigins: dbGet("pr_cigar_origins", null) || JSON.parse(JSON.stringify(DEFAULT_CIGAR_ORIGINS)),
   cigarNav: { level: "root", originKey: null, brand: null, line: null },
@@ -400,6 +453,7 @@ let STATE = {
 };
 if(!dbGet("pr_products", null)) dbSet("pr_products", SEED_PRODUCTS);
 if(!dbGet("pr_home_links", null)) dbSet("pr_home_links", DEFAULT_HOME_LINKS);
+if(!dbGet("pr_hero_slides", null)) dbSet("pr_hero_slides", DEFAULT_HERO_SLIDES);
 if(!dbGet("pr_cigar_origins", null)) dbSet("pr_cigar_origins", STATE.cigarOrigins);
 
 function persist(){
@@ -703,14 +757,32 @@ function renderStore(){
         ${results.map(p=>productCard(p)).join("") || `<div class="empty" style="grid-column:1/-1">No products match that search.</div>`}
       </div>`;
     } else if(STATE.category === "Home"){
-      const links = STATE.homeLinks || DEFAULT_HOME_LINKS;
+      const links = (STATE.homeLinks || DEFAULT_HOME_LINKS).slice(0,4);
+      const slides = (STATE.heroSlides && STATE.heroSlides.length ? STATE.heroSlides : DEFAULT_HERO_SLIDES);
+      const hi = Math.min(STATE.heroIndex || 0, slides.length-1);
+      const slide = slides[hi] || slides[0];
       body = `
+      <div class="promo-bar">🚚 ORDERS OVER $300 — FREE DELIVERY ACROSS AUSTRALIA.</div>
       ${searchBar()}
       <div class="cat-row">
         ${["Home",...CATEGORIES].map(c=>`<button class="cat-btn ${STATE.category===c?'active':''}" data-act="setcat" data-val="${c}">${esc(c)}</button>`).join("")}
       </div>
+
+      <div class="hero">
+        ${slide.image?`<div class="hero-bg"><img src="${esc(slide.image)}" alt=""/></div>`:""}
+        <div class="hero-inner">
+          ${slide.eyebrow?`<div class="hero-eyebrow"><span class="hero-rule"></span>${esc(slide.eyebrow)}</div>`:""}
+          <h2 class="hero-heading">${esc(slide.heading||"")}</h2>
+          ${slide.sub?`<p class="hero-sub">${esc(slide.sub)}</p>`:""}
+          ${slide.btn?`<button class="hero-btn" data-act="homelinkgo" data-target="${esc(slide.target||"")}">${esc(slide.btn)}</button>`:""}
+        </div>
+        ${slides.length>1?`<div class="hero-dots">
+          ${slides.map((_,i)=>`<button class="hero-dot ${i===hi?'active':''}" data-act="heroslide" data-val="${i}" aria-label="Slide ${i+1}"></button>`).join("")}
+        </div>`:""}
+      </div>
+
       <div class="home-links-grid">
-        ${links.map((l,i)=>{
+        ${links.map((l)=>{
           const target = l.target || (l.category ? `category:${l.category}` : "");
           const fallbackLabel = target.startsWith("category:") ? target.slice(9) : (l.label || "Shop");
           return `
@@ -720,6 +792,16 @@ function renderStore(){
           </button>`;
         }).join("")}
       </div>
+
+      <div class="info-strip">
+        ${INFO_BOXES.map(b=>`
+          <div class="info-box">
+            <div class="info-icon">${b.icon}</div>
+            <div class="info-title">${esc(b.title)}</div>
+            <div class="info-sub">${esc(b.sub)}</div>
+          </div>`).join("")}
+      </div>
+
       <div class="home-footer">Cigar Brothers — Contact us 0414790053</div>
       `;
     } else if(STATE.category === "Cigars"){
@@ -1016,18 +1098,31 @@ function resolveHomeLinkTarget(target){
 }
 
 function renderHomePageAdmin(){
-  const links = STATE.homeLinks || DEFAULT_HOME_LINKS;
+  const links = (STATE.homeLinks || DEFAULT_HOME_LINKS).slice(0,4);
+  const slides = (STATE.heroSlides && STATE.heroSlides.length ? STATE.heroSlides : DEFAULT_HERO_SLIDES);
   return `<div class="panel">
-    <h3 class="section-label">Home Page Link Boxes</h3>
-    <p class="cart-row-sub" style="margin-bottom:14px">These boxes are what members see on the Home tab. Link each one to a category, a cigar origin, a specific brand, or one individual product.</p>
+    <h3 class="section-label">Home Page Slider</h3>
+    <p class="cart-row-sub" style="margin-bottom:14px">The large box at the top of the Home tab. It rotates through these slides automatically.</p>
+    ${slides.map((sl,i)=>`
+      <div style="border:1px solid var(--border);border-radius:5px;padding:12px;margin-bottom:12px">
+        <div class="section-label" style="margin-top:0">Slide ${i+1}</div>
+        <div class="field"><label>Small label above the heading</label><input data-hs-field="eyebrow" data-hs-index="${i}" value="${esc(sl.eyebrow||"")}" placeholder="e.g. PREMIUM CIGARS"/></div>
+        <div class="field"><label>Heading</label><input data-hs-field="heading" data-hs-index="${i}" value="${esc(sl.heading||"")}" placeholder="e.g. Elevate Your Experience."/></div>
+        <div class="field"><label>Text under the heading</label><input data-hs-field="sub" data-hs-index="${i}" value="${esc(sl.sub||"")}" placeholder="e.g. Hand selected. Expertly curated."/></div>
+        <div class="field"><label>Button text</label><input data-hs-field="btn" data-hs-index="${i}" value="${esc(sl.btn||"")}" placeholder="e.g. Shop Cigars"/></div>
+        ${imageField(`hs-img-${i}`, sl.image, "Background photo (optional)")}
+        <div class="field"><label>Button links to</label>
+          <select data-hs-field="target" data-hs-index="${i}">${buildHomeLinkOptions(sl.target||"")}</select>
+        </div>
+      </div>`).join("")}
+
+    <h3 class="section-label" style="margin-top:22px">Home Page Link Boxes</h3>
+    <p class="cart-row-sub" style="margin-bottom:14px">The four boxes below the slider. Link each one to a category, a cigar origin, a specific brand, or one individual product.</p>
     ${links.map((l,i)=>{
       const selectedTarget = l.target || (l.category ? `category:${l.category}` : "");
       return `
       <div style="border:1px solid var(--border);border-radius:5px;padding:12px;margin-bottom:12px">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div class="section-label" style="margin-top:0">Box ${i+1}</div>
-          ${links.length>1?`<button class="sm-btn" data-act="delhomebox" data-val="${i}">Remove</button>`:""}
-        </div>
+        <div class="section-label" style="margin-top:0">Box ${i+1}</div>
         <div class="field"><label>Label</label><input data-hl-field="label" data-hl-index="${i}" value="${esc(l.label)}" placeholder="e.g. New Arrivals"/></div>
         ${imageField(`hl-img-${i}`, l.image, "Photo")}
         <div class="field"><label>Links to</label>
@@ -1035,10 +1130,7 @@ function renderHomePageAdmin(){
         </div>
       </div>`;
     }).join("")}
-    <div style="display:flex;gap:10px">
-      <button class="ghost-btn" data-act="addhomebox">+ Add Another Box</button>
-      <button class="primary-btn" data-act="savehomelinks" style="flex:1">Save Home Page</button>
-    </div>
+    <button class="primary-btn" data-act="savehomelinks">Save Home Page</button>
   </div>`;
 }
 
@@ -1211,6 +1303,7 @@ async function handleAction(e){
   else if(act==="setcat"){ STATE.category = val; STATE.cigarNav = { level: "root", originKey: null, brand: null, line: null }; STATE.searchQuery = ""; pushNavState(); render(); }
   else if(act==="dosearch"){ STATE.searchQuery = document.getElementById("search-input").value.trim(); render(); }
   else if(act==="clearsearch"){ STATE.searchQuery = ""; render(); }
+  else if(act==="heroslide"){ STATE.heroIndex = parseInt(val,10)||0; render(); }
   else if(act==="homelinkgo"){ resolveHomeLinkTarget(el.dataset.target); pushNavState(); render(); }
 
   else if(act==="cigarnav"){
@@ -1420,13 +1513,21 @@ async function handleAction(e){
   }
 
   else if(act==="savehomelinks"){
-    const links = (STATE.homeLinks || DEFAULT_HOME_LINKS).map((l,i)=>{
+    const slides = (STATE.heroSlides && STATE.heroSlides.length ? STATE.heroSlides : DEFAULT_HERO_SLIDES).map((sl,i)=>{
+      const g = f => { const el = document.querySelector(`[data-hs-field="${f}"][data-hs-index="${i}"]`); return el ? el.value.trim() : ""; };
+      const imgEl = document.getElementById(`hs-img-${i}`);
+      return { eyebrow:g("eyebrow"), heading:g("heading"), sub:g("sub"), btn:g("btn"),
+               target:g("target"), image: imgEl ? imgEl.value.trim() : (sl.image||"") };
+    });
+    const links = (STATE.homeLinks || DEFAULT_HOME_LINKS).slice(0,4).map((l,i)=>{
       const label = document.querySelector(`[data-hl-field="label"][data-hl-index="${i}"]`).value.trim();
       const image = document.getElementById(`hl-img-${i}`).value.trim();
       const target = document.querySelector(`[data-hl-field="target"][data-hl-index="${i}"]`).value;
       return { label, image, target };
     });
+    STATE.heroSlides = slides;
     STATE.homeLinks = links;
+    if(STATE.heroIndex >= slides.length) STATE.heroIndex = 0;
     setState({});
     flash("Home page updated.");
   }
@@ -1595,8 +1696,12 @@ async function boot(){
     // couldn't connect at this moment.
     flash("Couldn't reach the server — showing the last saved copy on this device.", "err");
   }
-  if((STATE.homeLinks||[]).length < 8){
-    while(STATE.homeLinks.length < 8) STATE.homeLinks.push({ label: "", image: "", target: "" });
+  // Home page now shows exactly 4 link boxes; trim or pad older saved data to match.
+  if(!Array.isArray(STATE.homeLinks)) STATE.homeLinks = [...DEFAULT_HOME_LINKS];
+  if(STATE.homeLinks.length > 4) STATE.homeLinks = STATE.homeLinks.slice(0,4);
+  while(STATE.homeLinks.length < 4) STATE.homeLinks.push({ label: "", image: "", target: "" });
+  if(!Array.isArray(STATE.heroSlides) || STATE.heroSlides.length === 0){
+    STATE.heroSlides = DEFAULT_HERO_SLIDES.map(s=>({...s}));
   }
 
   const params = new URLSearchParams(window.location.search);
@@ -1632,6 +1737,19 @@ async function boot(){
   render();
 }
 boot();
+
+// Hero slider: advance every 6s, but only while the Home tab is actually on screen.
+setInterval(()=>{
+  if(!STATE.session) return;
+  if(STATE.category !== "Home") return;
+  if(STATE.storeScreen !== "shop") return;
+  if(STATE.searchQuery) return;
+  const n = (STATE.heroSlides && STATE.heroSlides.length) ? STATE.heroSlides.length : 0;
+  if(n < 2) return;
+  if(document.hidden) return;
+  STATE.heroIndex = ((STATE.heroIndex || 0) + 1) % n;
+  render();
+}, 6000);
 // iOS has no install prompt event — show manual instructions once, if not already installed.
 if(isIOS() && !isStandalone()){
   const banner = document.getElementById("install-banner");
