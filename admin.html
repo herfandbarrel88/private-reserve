@@ -120,6 +120,11 @@
     padding:15px 42px 15px 17px;color:var(--text);cursor:pointer;}
   .origin-card::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;
     background-image:repeating-linear-gradient(45deg,rgba(201,161,92,.05) 0 2px,transparent 2px 9px);}
+  /* Rows cycle through three tones so a long list doesn't read as one flat block. */
+  .origin-card.tone-a{background:#171412;}
+  .origin-card.tone-b{background:#121110;}
+  .origin-card.tone-c{background:#141210;}
+  .origin-card.tone-c::before{opacity:.28;}
   .origin-card-name{position:relative;z-index:2;display:block;
     font-family:"Boucherie Block",Georgia,serif;font-size:19px;font-weight:normal;
     letter-spacing:.6px;text-transform:uppercase;line-height:1.2;}
@@ -675,9 +680,10 @@ function renderCigarsPage(){
     return `
       ${cigarCatRow()}
       <div class="origin-list">
-        ${originKeys.map(k=>{
+        ${originKeys.map((k,i)=>{
           const o = STATE.cigarOrigins[k];
-          return `<button class="origin-card" data-act="cigarnav" data-val="origin" data-origin="${k}">
+          const tone = ["tone-a","tone-b","tone-c"][i % 3];
+          return `<button class="origin-card ${tone}" data-act="cigarnav" data-val="origin" data-origin="${k}">
             <span class="origin-card-name">${esc(o.label)}</span>
             ${o.tagline?`<span class="origin-card-tag">${esc(o.tagline)}</span>`:""}
             <span class="origin-card-chev">›</span>
