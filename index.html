@@ -373,7 +373,13 @@ async function pushShared(onlyKeys){
     flash("Couldn't sync to the server — changes saved on this device only for now.", "err");
   }
 }
+let CURRENT_ACTION = null; // set by handleAction so persist() knows what changed
+let PENDING_PUSH = null;   // in-flight save, so a refresh can't read stale data mid-write
+
 async function pullShared(showFlash){
+  // If a save is still in flight, let it finish first — otherwise we can fetch the
+  // pre-save value and overwrite the user's change with it.
+  if(PENDING_PUSH){ try{ await PENDING_PUSH; }catch(e){} }
   try{
     const remote = await sbFetchAll();
     if(remote.pr_products) STATE.products = remote.pr_products;
@@ -501,13 +507,14 @@ if(!dbGet("pr_home_links", null)) dbSet("pr_home_links", DEFAULT_HOME_LINKS);
 if(!dbGet("pr_hero_slides", null)) dbSet("pr_hero_slides", DEFAULT_HERO_SLIDES);
 if(!dbGet("pr_cigar_origins", null)) dbSet("pr_cigar_origins", STATE.cigarOrigins);
 
-let CURRENT_ACTION = null; // set by handleAction so persist() knows what changed
-
 function persist(onlyKeys){
   dbSet("pr_session", STATE.session); // session stays local to this device on purpose
   if(ADMIN_PASSCODE){
     const scoped = onlyKeys || (CURRENT_ACTION ? ACTION_KEYS[CURRENT_ACTION] : null);
-    pushShared(scoped); // fire-and-forget sync of shared data to Supabase — admin sessions only
+    // Keep a handle on the save. pullShared() waits for this before fetching, so
+    // a refresh triggered moments after an edit can't pull the pre-save value and
+    // stamp it back over what the user just changed.
+    PENDING_PUSH = pushShared(scoped).finally(()=>{ PENDING_PUSH = null; });
   } else if(STATE.session && STATE.session.type === "admin"){
     // Session says admin, but there's no passcode in memory to authorize the save.
     // Never fail silently here — send them back to log in properly instead.
