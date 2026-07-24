@@ -1016,42 +1016,63 @@ function renderAdmin(){
   return renderTopbar("Back Office", "Private Reserve — Proprietor View", right) + tabRow + `<div class="content">${body}</div>`;
 }
 
+// Whatever the admin has typed into the product form but not yet saved. Same
+// reasoning as PENDING_IMAGES: any render() rebuilds the form from STATE, which
+// would otherwise wipe a half-finished edit (a price you just changed, say)
+// and put the old value straight back.
+const FORM_DRAFT = {};
+
+function draftOn(e){
+  const el = e.target;
+  if(el && el.id && el.id.startsWith("pf-")) FORM_DRAFT[el.id] = el.value;
+}
+document.addEventListener("input", draftOn, true);
+document.addEventListener("change", draftOn, true);
+
+// Value for a product-form field: what's been typed wins over what's stored.
+function clearProductDraft(){
+  Object.keys(FORM_DRAFT).forEach(k=>{ if(k.startsWith("pf-")) delete FORM_DRAFT[k]; });
+  delete PENDING_IMAGES["pf-img"];
+}
+
+const dv = (id, stored) => (FORM_DRAFT[id] !== undefined ? FORM_DRAFT[id] : (stored == null ? "" : stored));
+
 function renderProductsAdmin(){
   const editing = STATE.productForm;
   const f = editing ? STATE.products.find(p=>p.id===editing) : null;
   return `<div class="panel">
     <h3 class="section-label">${f?"Edit Product":"Add Product"}</h3>
     <div class="row2">
-      <div class="field"><label>Name</label><input id="pf-name" value="${esc(f?f.name:'')}"/></div>
+      <div class="field"><label>Name</label><input id="pf-name" value="${esc(dv("pf-name", f?f.name:''))}"/></div>
       <div class="field"><label>Category</label>
-        <select id="pf-cat">${CATEGORIES.map(c=>`<option value="${c}" ${f&&f.category===c?'selected':''}>${c}</option>`).join("")}</select>
+        <select id="pf-cat">${CATEGORIES.map(c=>`<option value="${c}" ${dv("pf-cat", f?f.category:CATEGORIES[0])===c?'selected':''}>${c}</option>`).join("")}</select>
       </div>
     </div>
     <div class="row2">
-      <div class="field"><label>Single Price ($)</label><input id="pf-price" type="number" value="${f?f.price:''}"/></div>
-      <div class="field"><label>Stock</label><input id="pf-stock" type="number" value="${f?f.stock:''}"/></div>
+      <div class="field"><label>Single Price ($)</label><input id="pf-price" type="number" value="${esc(dv("pf-price", f?f.price:''))}"/></div>
+      <div class="field"><label>Stock</label><input id="pf-stock" type="number" value="${esc(dv("pf-stock", f?f.stock:''))}"/></div>
     </div>
     <div class="row2">
-      <div class="field"><label>Box Price ($, optional)</label><input id="pf-boxprice" type="number" value="${f&&f.boxPrice?f.boxPrice:''}" placeholder="Leave blank if no box option"/></div>
-      <div class="field"><label>Box Label (optional)</label><input id="pf-boxlabel" value="${esc(f?f.boxLabel||'':'')}" placeholder="e.g. Box of 25"/></div>
+      <div class="field"><label>Box Price ($, optional)</label><input id="pf-boxprice" type="number" value="${esc(dv("pf-boxprice", f&&f.boxPrice?f.boxPrice:''))}" placeholder="Leave blank if no box option"/></div>
+      <div class="field"><label>Box Label (optional)</label><input id="pf-boxlabel" value="${esc(dv("pf-boxlabel", f?f.boxLabel||'':''))}" placeholder="e.g. Box of 25"/></div>
     </div>
     ${imageField("pf-img", f?f.image:"", "Photo")}
-    <div class="field"><label>Description</label><textarea id="pf-desc" style="min-height:60px">${esc(f?f.description:'')}</textarea></div>
+    <div class="field"><label>Description</label><textarea id="pf-desc" style="min-height:60px">${esc(dv("pf-desc", f?f.description:''))}</textarea></div>
     <h3 class="section-label" style="margin-top:18px">Cigar Details (only used when Category is Cigars)</h3>
     <div class="row3">
       <div class="field"><label>Origin</label>
         <select id="pf-origin">
           <option value="">— none —</option>
-          ${Object.values(STATE.cigarOrigins).map(o=>`<option value="${esc(o.key)}" ${f&&f.cigarOrigin===o.key?'selected':''}>${esc(o.key)}</option>`).join("")}
+          ${Object.values(STATE.cigarOrigins).map(o=>`<option value="${esc(o.key)}" ${dv("pf-origin", f?f.cigarOrigin:'')===o.key?'selected':''}>${esc(o.key)}</option>`).join("")}
         </select>
       </div>
       <div class="field"><label>Brand (Cuban / Davidoff only)</label>
         <select id="pf-brand">
           <option value="">— none —</option>
-          ${Object.entries(STATE.cigarOrigins).filter(([k])=>originUsesBrands(k)).map(([,o])=>`<optgroup label="${esc(o.key)}">${o.brands.map(b=>`<option value="${esc(b)}" ${f&&f.cigarBrand===b?'selected':''}>${esc(b)}</option>`).join("")}</optgroup>`).join("")}
+          ${Object.entries(STATE.cigarOrigins).filter(([k])=>originUsesBrands(k)).map(([,o])=>`<optgroup label="${esc(o.key)}">${o.brands.map(b=>`<option value="${esc(b)}" ${dv("pf-brand", f?f.cigarBrand:'')===b?'selected':''}>${esc(b)}</option>`).join("")}</optgroup>`).join("")}
         </select>
       </div>
-      <div class="field"><label>Line / Collection</label><input id="pf-line" value="${esc(f?f.cigarLine||'':'')}" placeholder="e.g. Siglo VI"/></div>
+      <div class="field"><label>Line / Collection</label><input id="pf-line" value="${esc(dv("pf-line", f?f.cigarLine||'':''))}" placeholder="e.g. Siglo VI"/></div>
     </div>
     <p class="small-note" style="margin-top:-6px">For any origin other than Cuban or Davidoff, just set Origin — leave Brand and Line blank. The product shows up right on its origin page.</p>
     <div style="display:flex;gap:10px">
@@ -1362,7 +1383,10 @@ function readHomePageForm(){
 
 // Same reasoning as readHomePageForm — grab the product fields before any refresh.
 function readProductForm(){
-  const g = id => { const el = document.getElementById(id); return el ? el.value : null; };
+  const g = id => {
+    if(FORM_DRAFT[id] !== undefined) return FORM_DRAFT[id];   // what was typed wins
+    const el = document.getElementById(id); return el ? el.value : null;
+  };
   if(g("pf-name") === null) return null;
   return {
     name: g("pf-name").trim(),
@@ -1572,8 +1596,8 @@ async function handleAction(e){
 
   else if(act==="admintab"){ STATE.adminTab = val; STATE.productForm=null; render(); }
 
-  else if(act==="editproduct"){ delete PENDING_IMAGES["pf-img"]; STATE.productForm = val; render(); }
-  else if(act==="canceledit"){ delete PENDING_IMAGES["pf-img"]; STATE.productForm = null; render(); }
+  else if(act==="editproduct"){ clearProductDraft(); STATE.productForm = val; render(); }
+  else if(act==="canceledit"){ clearProductDraft(); STATE.productForm = null; render(); }
   else if(act==="delproduct"){
     if(!confirm("Delete this product? This can't be undone.")) return;
     STATE.products = STATE.products.filter(p=>p.id!==val);
@@ -1595,7 +1619,7 @@ async function handleAction(e){
       STATE.products = [{id:genId("prod"),name,category,price,stock,boxPrice,boxLabel,image,description,cigarOrigin,cigarBrand,cigarLine}, ...STATE.products];
       flash("Product added.");
     }
-    delete PENDING_IMAGES["pf-img"];
+    clearProductDraft();
     STATE.productForm = null;
     setState({});
   }
