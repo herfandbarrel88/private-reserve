@@ -127,18 +127,22 @@
   .brand-tile-name{position:relative;z-index:2;width:100%;padding:10px 12px 11px;text-align:left;
     font-family:"Boucherie Block",Georgia,serif;font-weight:normal;font-size:15px;
     letter-spacing:.5px;text-transform:uppercase;color:#F4EFE4;line-height:1.15;}
+  /* Tiles whose artwork already carries the brand name: no fade, no label —
+     centre the logo instead of pushing it up for text that isn't there. */
+  .brand-tile.no-name{align-items:center;}
+  .brand-tile.no-name .brand-tile-img{object-fit:contain;background:#EEE9E0;}
 
   /* --- Cigars: origin cards --- */
   .origin-list{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;}
   .origin-card{position:relative;overflow:hidden;display:block;width:100%;text-align:left;
-    background:var(--surface);border:1px solid var(--border);border-radius:7px;
+    background:#15120F;border:1px solid var(--border);border-radius:7px;
     padding:15px 42px 15px 17px;color:var(--text);cursor:pointer;}
   .origin-card::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;
     background-image:repeating-linear-gradient(45deg,rgba(201,161,92,.05) 0 2px,transparent 2px 9px);}
   /* Rows cycle through three tones so a long list doesn't read as one flat block. */
-  .origin-card.tone-a{background:#171412;}
-  .origin-card.tone-b{background:#121110;}
-  .origin-card.tone-c{background:#141210;}
+  .origin-card.tone-a{background:#1A1613;}
+  .origin-card.tone-b{background:#100E0C;}
+  .origin-card.tone-c{background:#151210;}
   .origin-card.tone-c::before{opacity:.28;}
   .origin-card-name{position:relative;z-index:2;display:block;
     font-family:"Boucherie Block",Georgia,serif;font-size:19px;font-weight:normal;
@@ -765,10 +769,12 @@ function renderCigarsPage(){
         <div class="brand-grid">
           ${byName(origin.brands).map(b=>{
             const img = (STATE.cigarBrandImages||{})[b] || "";
-            return `<button class="brand-tile" data-act="cigarnav" data-val="brand" data-origin="${nav.originKey}" data-brand="${esc(b)}">
+            // Cuban brand artwork already carries the brand name, so no overlay.
+            const showName = nav.originKey !== "cuban";
+            return `<button class="brand-tile${showName?"":" no-name"}" data-act="cigarnav" data-val="brand" data-origin="${nav.originKey}" data-brand="${esc(b)}">
               ${img?`<img class="brand-tile-img" src="${esc(img)}" alt=""/>`:`<span class="brand-tile-fallback">🚬</span>`}
-              <span class="brand-tile-shade"></span>
-              <span class="brand-tile-name">${esc(b)}</span>
+              ${showName?`<span class="brand-tile-shade"></span>
+              <span class="brand-tile-name">${esc(b)}</span>`:""}
             </button>`;
           }).join("")}
         </div>`;
