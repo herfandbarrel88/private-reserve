@@ -113,6 +113,21 @@
   .home-footer{text-align:center;font-size:12px;color:var(--muted);margin-top:26px;padding-top:16px;
     border-top:1px solid var(--border);}
 
+  /* --- Cigars: brand / line tiles (name sits on the photo, no label bar) --- */
+  .brand-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px;}
+  .brand-tile{position:relative;overflow:hidden;display:flex;align-items:flex-end;
+    aspect-ratio:1/1;width:100%;padding:0;border:1px solid var(--border);border-radius:7px;
+    background:var(--surface2);cursor:pointer;}
+  .brand-tile-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+    filter:brightness(.88) saturate(1.05);}
+  .brand-tile-fallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:24px;color:var(--muted2);}
+  .brand-tile-shade{position:absolute;inset:0;
+    background:linear-gradient(180deg,rgba(12,10,9,.06) 34%,rgba(12,10,9,.62) 72%,rgba(12,10,9,.93) 100%);}
+  .brand-tile-name{position:relative;z-index:2;width:100%;padding:10px 12px 11px;text-align:left;
+    font-family:"Boucherie Block",Georgia,serif;font-weight:normal;font-size:15px;
+    letter-spacing:.5px;text-transform:uppercase;color:#F4EFE4;line-height:1.15;}
+
   /* --- Cigars: origin cards --- */
   .origin-list{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;}
   .origin-card{position:relative;overflow:hidden;display:block;width:100%;text-align:left;
@@ -747,12 +762,13 @@ function renderCigarsPage(){
       return `
         ${cigarCatRow()}
         ${cigarBreadcrumb()}
-        <div class="home-links-grid">
+        <div class="brand-grid">
           ${byName(origin.brands).map(b=>{
             const img = (STATE.cigarBrandImages||{})[b] || "";
-            return `<button class="home-link-box" data-act="cigarnav" data-val="brand" data-origin="${nav.originKey}" data-brand="${esc(b)}">
-              <div class="home-link-img">${img?`<img src="${esc(img)}" style="width:100%;height:100%;object-fit:cover"/>`:`<span class="p-img-fallback">🚬</span>`}</div>
-              <div class="home-link-label">${esc(b)}</div>
+            return `<button class="brand-tile" data-act="cigarnav" data-val="brand" data-origin="${nav.originKey}" data-brand="${esc(b)}">
+              ${img?`<img class="brand-tile-img" src="${esc(img)}" alt=""/>`:`<span class="brand-tile-fallback">🚬</span>`}
+              <span class="brand-tile-shade"></span>
+              <span class="brand-tile-name">${esc(b)}</span>
             </button>`;
           }).join("")}
         </div>`;
@@ -774,12 +790,13 @@ function renderCigarsPage(){
     return `
       ${cigarCatRow()}
       ${cigarBreadcrumb()}
-      <div class="home-links-grid">
+      <div class="brand-grid">
         ${lines.map(line=>{
           const sample = brandCigars.find(p=>p.cigarLine===line);
-          return `<button class="home-link-box" data-act="cigarnav" data-val="line" data-line="${esc(line)}">
-            <div class="home-link-img">${sample&&sample.image?`<img src="${esc(sample.image)}" style="width:100%;height:100%;object-fit:cover"/>`:`<span class="p-img-fallback">🚬</span>`}</div>
-            <div class="home-link-label">${esc(line)}</div>
+          return `<button class="brand-tile" data-act="cigarnav" data-val="line" data-line="${esc(line)}">
+            ${sample&&sample.image?`<img class="brand-tile-img" src="${esc(sample.image)}" alt=""/>`:`<span class="brand-tile-fallback">🚬</span>`}
+            <span class="brand-tile-shade"></span>
+            <span class="brand-tile-name">${esc(line)}</span>
           </button>`;
         }).join("") || `<div class="empty" style="grid-column:1/-1">No lines added for ${esc(nav.brand)} yet — add products in the Back Office and tag them with this brand.</div>`}
       </div>`;
