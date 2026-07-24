@@ -14,6 +14,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="PR Admin" />
 <meta name="theme-color" content="#161310" />
+<meta name="color-scheme" content="dark" />
 <style>
   @font-face{
     font-family:"Boucherie Block";
@@ -29,6 +30,10 @@
     --good:#7fae82; --bad:#b6564a;
   }
   *{box-sizing:border-box;}
+  /* This app is already a dark theme. Without this, phone browsers with
+     "force dark mode" turned on try to darken it again and end up LIGHTENING
+     the panels instead — dark rows come out mid-grey. */
+  :root{color-scheme:dark;}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
     font-family:'Montserrat',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     -webkit-tap-highlight-color:transparent;}
