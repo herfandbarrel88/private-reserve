@@ -137,6 +137,14 @@
   .brand-tile.no-name{align-items:center;}
   .brand-tile.no-name .brand-tile-img{object-fit:contain;background:#EEE9E0;}
 
+  /* --- Cigars: section dividers (Premium Selection / Cigars Under $40) --- */
+  .cigars-divider{display:flex;align-items:center;gap:14px;margin:22px 2px 14px;}
+  .cigars-divider:first-child{margin-top:4px;}
+  .cigars-divider-line{flex:1;height:1px;
+    background:linear-gradient(90deg,transparent,rgba(201,161,92,.5),transparent);}
+  .cigars-divider-text{font-family:"Boucherie Block",Georgia,serif;font-size:16px;
+    letter-spacing:1.5px;text-transform:uppercase;color:var(--gold);white-space:nowrap;}
+
   /* --- Cigars: origin cards --- */
   .origin-list{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;}
   .origin-card{position:relative;overflow:hidden;display:block;width:100%;text-align:left;
@@ -745,21 +753,39 @@ function renderCigarsPage(){
   if(nav.level === "root"){
     const taggedOrigins = originKeys.map(k=>STATE.cigarOrigins[k].key.toLowerCase());
     const other = productsByName(cigars.filter(p=>!taggedOrigins.includes((p.cigarOrigin||"").trim().toLowerCase())));
+
+    // Cuban and Davidoff are pinned at the top under "Premium Selection";
+    // everything else sits below the "Cigars Under $40" heading.
+    const premiumKeys = originKeys.filter(k => k==="cuban" || k==="davidoff");
+    const restKeys    = originKeys.filter(k => k!=="cuban" && k!=="davidoff");
+
+    const renderRow = (k, i) => {
+      const o = STATE.cigarOrigins[k];
+      const tone = ["tone-a","tone-b","tone-c"][i % 3];
+      return `<button class="origin-card ${tone}" data-act="cigarnav" data-val="origin" data-origin="${k}">
+        <span class="origin-card-name">${esc(o.label)}</span>
+        ${o.tagline?`<span class="origin-card-tag">${esc(o.tagline)}</span>`:""}
+        <span class="origin-card-chev">›</span>
+      </button>`;
+    };
+    const divider = (label) => `<div class="cigars-divider">
+      <span class="cigars-divider-line"></span>
+      <span class="cigars-divider-text">${esc(label)}</span>
+      <span class="cigars-divider-line"></span>
+    </div>`;
+
     return `
       ${cigarCatRow()}
+      ${premiumKeys.length ? divider("Premium Selection") : ""}
       <div class="origin-list">
-        ${originKeys.map((k,i)=>{
-          const o = STATE.cigarOrigins[k];
-          const tone = ["tone-a","tone-b","tone-c"][i % 3];
-          return `<button class="origin-card ${tone}" data-act="cigarnav" data-val="origin" data-origin="${k}">
-            <span class="origin-card-name">${esc(o.label)}</span>
-            ${o.tagline?`<span class="origin-card-tag">${esc(o.tagline)}</span>`:""}
-            <span class="origin-card-chev">›</span>
-          </button>`;
-        }).join("")}
+        ${premiumKeys.map((k,i)=>renderRow(k,i)).join("")}
+      </div>
+      ${restKeys.length ? divider("Cigars Under $40") : ""}
+      <div class="origin-list">
+        ${restKeys.map((k,i)=>renderRow(k,i)).join("")}
       </div>
       <div class="grid">
-        ${other.map(p=>productCard(p)).join("") || `<div class="empty" style="grid-column:1/-1">No other cigars listed yet.</div>`}
+        ${other.map(p=>productCard(p)).join("") || ``}
       </div>`;
   }
 
