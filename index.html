@@ -314,14 +314,37 @@ async function sbUpsert(key, value){
   });
   if(!res.ok) throw new Error("Supabase upsert failed: " + res.status);
 }
-async function pushShared(){
+// Which shared keys each action actually touches. Sending only what changed keeps
+// the request small — the full payload (with every product photo) can exceed the
+// serverless request limit and silently fail, which looks like an edit "reverting".
+const ACTION_KEYS = {
+  saveproduct: ["pr_products"],
+  delproduct: ["pr_products"],
+  togglemember: ["pr_members"],
+  delmember: ["pr_members"],
+  addinvite: ["pr_invites"],
+  revokeinvite: ["pr_invites"],
+  orderstatus: ["pr_orders","pr_products"],
+  savehomelinks: ["pr_home_links","pr_hero_slides"],
+  addhomebox: ["pr_home_links"],
+  delhomebox: ["pr_home_links"],
+  addorigin: ["pr_cigar_origins"],
+  delorigin: ["pr_cigar_origins"],
+  togglelines: ["pr_cigar_origins"],
+  addbrand: ["pr_cigar_origins"],
+  delbrand: ["pr_cigar_origins"],
+  savecigarbrands: ["pr_cigar_brand_images"],
+  saveorigineditor: ["pr_cigar_origins","pr_products"],
+};
+
+async function pushShared(onlyKeys){
   if(!ADMIN_PASSCODE){
     console.error("pushShared called without an authenticated admin session");
     flash("Not authorized to save changes.", "err");
     return;
   }
   try{
-    const updates = {
+    const all = {
       pr_products: STATE.products,
       pr_members: STATE.members,
       pr_invites: STATE.invites,
@@ -331,6 +354,10 @@ async function pushShared(){
       pr_cigar_brand_images: STATE.cigarBrandImages,
       pr_cigar_origins: STATE.cigarOrigins,
     };
+    const keys = (Array.isArray(onlyKeys) && onlyKeys.length) ? onlyKeys : Object.keys(all);
+    const updates = {};
+    keys.forEach(k => { if(k in all) updates[k] = all[k]; });
+
     const res = await fetch("/.netlify/functions/admin-write", {
       method: "POST", headers: {"Content-Type":"application/json"},
       body: JSON.stringify({ passcode: ADMIN_PASSCODE, updates }),
@@ -340,11 +367,7 @@ async function pushShared(){
       flash(data.error || "Couldn't save changes.", "err");
       return;
     }
-    dbSet("pr_products", STATE.products); dbSet("pr_members", STATE.members);
-    dbSet("pr_invites", STATE.invites); dbSet("pr_orders", STATE.orders);
-    dbSet("pr_home_links", STATE.homeLinks);
-    dbSet("pr_hero_slides", STATE.heroSlides);
-    dbSet("pr_cigar_brand_images", STATE.cigarBrandImages); dbSet("pr_cigar_origins", STATE.cigarOrigins);
+    keys.forEach(k => { if(k in all) dbSet(k, all[k]); });
   }catch(e){
     console.error("sync failed", e);
     flash("Couldn't sync to the server — changes saved on this device only for now.", "err");
@@ -478,10 +501,13 @@ if(!dbGet("pr_home_links", null)) dbSet("pr_home_links", DEFAULT_HOME_LINKS);
 if(!dbGet("pr_hero_slides", null)) dbSet("pr_hero_slides", DEFAULT_HERO_SLIDES);
 if(!dbGet("pr_cigar_origins", null)) dbSet("pr_cigar_origins", STATE.cigarOrigins);
 
-function persist(){
+let CURRENT_ACTION = null; // set by handleAction so persist() knows what changed
+
+function persist(onlyKeys){
   dbSet("pr_session", STATE.session); // session stays local to this device on purpose
   if(ADMIN_PASSCODE){
-    pushShared(); // fire-and-forget sync of shared data to Supabase — admin sessions only
+    const scoped = onlyKeys || (CURRENT_ACTION ? ACTION_KEYS[CURRENT_ACTION] : null);
+    pushShared(scoped); // fire-and-forget sync of shared data to Supabase — admin sessions only
   } else if(STATE.session && STATE.session.type === "admin"){
     // Session says admin, but there's no passcode in memory to authorize the save.
     // Never fail silently here — send them back to log in properly instead.
@@ -500,7 +526,7 @@ function flash(msg, kind){
     if(t) t.remove(); else render();
   }, 3000);
 }
-function setState(patch){ Object.assign(STATE, patch); persist(); render(); }
+function setState(patch, onlyKeys){ Object.assign(STATE, patch); persist(onlyKeys); render(); }
 
 // Wires the phone/browser's native Back and Forward controls to the app's own
 // navigation (category, cigar drill-down, cart/checkout) instead of leaving the
@@ -1266,6 +1292,7 @@ async function handleAction(e){
   // server first. Without this, a browser tab left open a while could push a
   // stale, incomplete product list and silently overwrite newer changes made
   // elsewhere — this closes that gap.
+  CURRENT_ACTION = act;
   if(SHARED_MUTATING_ACTIONS.has(act) && ADMIN_PASSCODE){
     await pullShared(false);
   }
