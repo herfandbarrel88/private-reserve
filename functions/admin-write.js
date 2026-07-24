@@ -8,7 +8,7 @@ const { getIdentifier, checkRateLimit, recordFailure, recordSuccess } = require(
 
 const ALLOWED_KEYS = [
   "pr_products", "pr_members", "pr_invites", "pr_orders",
-  "pr_home_links", "pr_cigar_brand_images", "pr_cigar_origins",
+  "pr_home_links", "pr_hero_slides", "pr_cigar_brand_images", "pr_cigar_origins",
 ];
 
 async function sbGet(key) {
@@ -22,7 +22,7 @@ async function sbGet(key) {
   return rows[0] ? rows[0].value : null;
 }
 async function sbSet(key, value) {
-  await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=key`, {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=key`, {
     method: "POST",
     headers: {
       apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -32,6 +32,12 @@ async function sbSet(key, value) {
     },
     body: JSON.stringify([{ key, value }]),
   });
+  // Surface write failures instead of swallowing them — a silent failure here
+  // looks to the user like their edit "reverted" for no reason.
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(`Write failed for ${key} (${res.status}): ${detail.slice(0, 200)}`);
+  }
 }
 
 exports.handler = async (event) => {
@@ -54,10 +60,22 @@ exports.handler = async (event) => {
     await recordSuccess("pr_rate_adminwrite", identifier);
 
     const updates = body.updates || {};
-    const keys = Object.keys(updates).filter((k) => ALLOWED_KEYS.includes(k));
+    const requested = Object.keys(updates);
+    const keys = requested.filter((k) => ALLOWED_KEYS.includes(k));
+
+    // If the app asked to save something this function doesn't recognise, say so
+    // rather than quietly dropping it and reporting success.
+    const rejected = requested.filter((k) => !ALLOWED_KEYS.includes(k));
+    if (rejected.length) {
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ ok: false, error: `Server rejected unknown data: ${rejected.join(", ")}` }),
+      };
+    }
+
     await Promise.all(keys.map((k) => sbSet(k, updates[k])));
 
-    return { statusCode: 200, body: JSON.stringify({ ok: true }) };
+    return { statusCode: 200, body: JSON.stringify({ ok: true, saved: keys }) };
   } catch (err) {
     console.error(err);
     return { statusCode: 500, body: JSON.stringify({ ok: false, error: err.message }) };
