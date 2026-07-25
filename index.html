@@ -634,8 +634,19 @@ function render(){
   const root = document.getElementById("root");
   root.innerHTML = STATE.session ? renderApp() : renderGate();
   bindEvents();
-  const t = document.getElementById("toast");
-  // toast already in markup via renderApp/renderGate top-level wrapper
+  restoreDrafts();
+}
+
+// Safety net: after any render, put every in-progress draft value back into its
+// field. Fields wired with fieldVal()/dv() already show the draft, but this
+// catches anything not wired individually — so no admin field can ever silently
+// revert while you're typing, even ones added later.
+function restoreDrafts(){
+  if(!ADMIN_PASSCODE) return;               // only relevant while editing in the admin
+  Object.keys(FORM_DRAFT).forEach(id=>{
+    const el = document.getElementById(id);
+    if(el && el.value !== FORM_DRAFT[id]) el.value = FORM_DRAFT[id];
+  });
 }
 
 function renderGate(){
@@ -1293,13 +1304,13 @@ function renderHomePageAdmin(){
     ${slides.map((sl,i)=>`
       <div style="border:1px solid var(--border);border-radius:5px;padding:12px;margin-bottom:12px">
         <div class="section-label" style="margin-top:0">Slide ${i+1}</div>
-        <div class="field"><label>Small label above the heading</label><input data-hs-field="eyebrow" data-hs-index="${i}" value="${esc(sl.eyebrow||"")}" placeholder="e.g. PREMIUM CIGARS"/></div>
-        <div class="field"><label>Heading</label><input data-hs-field="heading" data-hs-index="${i}" value="${esc(sl.heading||"")}" placeholder="e.g. Elevate Your Experience."/></div>
-        <div class="field"><label>Text under the heading</label><input data-hs-field="sub" data-hs-index="${i}" value="${esc(sl.sub||"")}" placeholder="e.g. Hand selected. Expertly curated."/></div>
-        <div class="field"><label>Button text</label><input data-hs-field="btn" data-hs-index="${i}" value="${esc(sl.btn||"")}" placeholder="e.g. Shop Cigars"/></div>
+        <div class="field"><label>Small label above the heading</label><input id="hs-eyebrow-${i}" data-hs-field="eyebrow" data-hs-index="${i}" value="${esc(fieldVal(`hs-eyebrow-${i}`, sl.eyebrow||""))}" placeholder="e.g. PREMIUM CIGARS"/></div>
+        <div class="field"><label>Heading</label><input id="hs-heading-${i}" data-hs-field="heading" data-hs-index="${i}" value="${esc(fieldVal(`hs-heading-${i}`, sl.heading||""))}" placeholder="e.g. Elevate Your Experience."/></div>
+        <div class="field"><label>Text under the heading</label><input id="hs-sub-${i}" data-hs-field="sub" data-hs-index="${i}" value="${esc(fieldVal(`hs-sub-${i}`, sl.sub||""))}" placeholder="e.g. Hand selected. Expertly curated."/></div>
+        <div class="field"><label>Button text</label><input id="hs-btn-${i}" data-hs-field="btn" data-hs-index="${i}" value="${esc(fieldVal(`hs-btn-${i}`, sl.btn||""))}" placeholder="e.g. Shop Cigars"/></div>
         ${imageField(`hs-img-${i}`, sl.image, "Background photo (optional)")}
         <div class="field"><label>Button links to</label>
-          <select data-hs-field="target" data-hs-index="${i}">${buildHomeLinkOptions(sl.target||"")}</select>
+          <select id="hs-target-${i}" data-hs-field="target" data-hs-index="${i}">${buildHomeLinkOptions(fieldVal(`hs-target-${i}`, sl.target||""))}</select>
         </div>
       </div>`).join("")}
 
@@ -1310,10 +1321,10 @@ function renderHomePageAdmin(){
       return `
       <div style="border:1px solid var(--border);border-radius:5px;padding:12px;margin-bottom:12px">
         <div class="section-label" style="margin-top:0">Box ${i+1}</div>
-        <div class="field"><label>Label</label><input data-hl-field="label" data-hl-index="${i}" value="${esc(l.label)}" placeholder="e.g. New Arrivals"/></div>
+        <div class="field"><label>Label</label><input id="hl-label-${i}" data-hl-field="label" data-hl-index="${i}" value="${esc(fieldVal(`hl-label-${i}`, l.label))}" placeholder="e.g. New Arrivals"/></div>
         ${imageField(`hl-img-${i}`, l.image, "Photo")}
         <div class="field"><label>Links to</label>
-          <select data-hl-field="target" data-hl-index="${i}">${buildHomeLinkOptions(selectedTarget)}</select>
+          <select id="hl-target-${i}" data-hl-field="target" data-hl-index="${i}">${buildHomeLinkOptions(fieldVal(`hl-target-${i}`, selectedTarget))}</select>
         </div>
       </div>`;
     }).join("")}
@@ -1361,7 +1372,7 @@ function renderCigarOriginsAdmin(){
               <button class="sm-btn" data-act="delbrand" data-origin="${esc(dictKey)}" data-brand="${esc(b)}">Remove</button>
             </div>
           `).join("")}
-          <div class="field" style="margin-top:10px"><label>Add a brand</label><input id="new-brand-${esc(dictKey)}" placeholder="e.g. Padrón"/></div>
+          <div class="field" style="margin-top:10px"><label>Add a brand</label><input id="new-brand-${esc(dictKey)}" value="${esc(fieldVal(`new-brand-${dictKey}`,''))}" placeholder="e.g. Padrón"/></div>
           <button class="ghost-btn" data-act="addbrand" data-val="${esc(dictKey)}">+ Add Brand</button>
         ` : `
           <p class="cart-row-sub" style="margin-top:10px">Tag a product with Origin "${esc(o.key)}" in the Products tab and it'll show up right here automatically — no brand to set up.</p>
@@ -1425,24 +1436,21 @@ function readHomePageForm(){
   if(!slideCount && !document.getElementById("hl-img-0")) return null; // form isn't open
   const slides = [];
   for(let i=0; i<slideCount; i++){
-    const g = f => { const el = document.querySelector(`[data-hs-field="${f}"][data-hs-index="${i}"]`); return el ? el.value.trim() : ""; };
-    const key = `hs-img-${i}`;
-    const imgEl = document.getElementById(key);
-    const img = (PENDING_IMAGES[key] !== undefined) ? PENDING_IMAGES[key] : (imgEl ? imgEl.value.trim() : "");
-    slides.push({ eyebrow:g("eyebrow"), heading:g("heading"), sub:g("sub"), btn:g("btn"),
-                  target:g("target"), image: img });
+    const gv = f => fieldVal(`hs-${f}-${i}`, (()=>{ const el=document.getElementById(`hs-${f}-${i}`); return el?el.value:""; })());
+    const imgEl = document.getElementById(`hs-img-${i}`);
+    const img = (PENDING_IMAGES[`hs-img-${i}`] !== undefined) ? PENDING_IMAGES[`hs-img-${i}`] : (imgEl ? imgEl.value.trim() : "");
+    slides.push({ eyebrow:gv("eyebrow").trim(), heading:gv("heading").trim(), sub:gv("sub").trim(),
+                  btn:gv("btn").trim(), target:gv("target"), image: img });
   }
   const links = [];
   for(let i=0; i<4; i++){
-    const labelEl  = document.querySelector(`[data-hl-field="label"][data-hl-index="${i}"]`);
-    const targetEl = document.querySelector(`[data-hl-field="target"][data-hl-index="${i}"]`);
-    const key      = `hl-img-${i}`;
-    const imgEl    = document.getElementById(key);
+    const labelEl  = document.getElementById(`hl-label-${i}`);
+    const imgEl    = document.getElementById(`hl-img-${i}`);
     if(!labelEl && !imgEl) continue;
     links.push({
-      label:  labelEl  ? labelEl.value.trim()  : "",
-      image:  (PENDING_IMAGES[key] !== undefined) ? PENDING_IMAGES[key] : (imgEl ? imgEl.value.trim() : ""),
-      target: targetEl ? targetEl.value        : "",
+      label:  fieldVal(`hl-label-${i}`, labelEl ? labelEl.value : "").trim(),
+      image:  (PENDING_IMAGES[`hl-img-${i}`] !== undefined) ? PENDING_IMAGES[`hl-img-${i}`] : (imgEl ? imgEl.value.trim() : ""),
+      target: fieldVal(`hl-target-${i}`, (()=>{ const el=document.getElementById(`hl-target-${i}`); return el?el.value:""; })()),
     });
   }
   return { slides, links };
@@ -1769,6 +1777,7 @@ async function handleAction(e){
     if(snap.links.length)  STATE.homeLinks  = snap.links;
     if(STATE.heroIndex >= STATE.heroSlides.length) STATE.heroIndex = 0;
     Object.keys(PENDING_IMAGES).forEach(k=>{ if(k.startsWith("hl-img-")||k.startsWith("hs-img-")) delete PENDING_IMAGES[k]; });
+    clearDraft("hs-"); clearDraft("hl-");
     setState({});
     flash("Home page updated.");
   }
@@ -1838,12 +1847,14 @@ async function handleAction(e){
     setState({});
   }
   else if(act==="addbrand"){
+    const draftB = FORM_DRAFT[`new-brand-${val}`];
     const input = document.getElementById(`new-brand-${val}`);
-    const name = input.value.trim();
+    const name = ((draftB !== undefined ? draftB : (input ? input.value : "")) || "").trim();
     if(!name) return flash("Enter a brand name.","err");
     const origin = STATE.cigarOrigins[val];
     if((origin.brands||[]).includes(name)) return flash("That brand is already listed.","err");
     STATE.cigarOrigins = { ...STATE.cigarOrigins, [val]: { ...origin, brands: [...(origin.brands||[]), name] } };
+    clearDraft(`new-brand-${val}`);
     setState({});
     flash("Brand added.");
   }
