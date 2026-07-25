@@ -600,7 +600,11 @@ function flash(msg, kind){
   setTimeout(()=>{
     STATE.toast = null;
     const t = document.getElementById("toast-el");
-    if(t) t.remove(); else render();
+    if(t){ t.remove(); return; }
+    // Don't re-render (which would steal focus) if the user is typing in a field.
+    const a = document.activeElement;
+    if(a && (a.tagName==="INPUT" || a.tagName==="TEXTAREA" || a.tagName==="SELECT")) return;
+    render();
   }, 3000);
 }
 function setState(patch, onlyKeys){ Object.assign(STATE, patch); persist(onlyKeys); render(); }
@@ -631,10 +635,30 @@ window.addEventListener("popstate", (e)=>{
 
 /* ================= RENDER ================= */
 function render(){
+  // Remember which field is focused and where the cursor sits, so a re-render
+  // triggered mid-typing doesn't kick the user out of the box they're using.
+  const active = document.activeElement;
+  const focusId = active && active.id ? active.id : null;
+  let selStart = null, selEnd = null;
+  if(focusId && (active.tagName==="INPUT" || active.tagName==="TEXTAREA")){
+    try{ selStart = active.selectionStart; selEnd = active.selectionEnd; }catch(e){}
+  }
+
   const root = document.getElementById("root");
   root.innerHTML = STATE.session ? renderApp() : renderGate();
   bindEvents();
   restoreDrafts();
+
+  // Put focus (and the cursor) back where it was.
+  if(focusId){
+    const el = document.getElementById(focusId);
+    if(el){
+      try{
+        el.focus();
+        if(selStart !== null && el.setSelectionRange) el.setSelectionRange(selStart, selEnd);
+      }catch(e){}
+    }
+  }
 }
 
 // Safety net: after any render, put every in-progress draft value back into its
