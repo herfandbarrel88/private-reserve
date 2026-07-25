@@ -504,7 +504,27 @@ const genOrderNo = () => "PR-"+Math.floor(100000+Math.random()*900000);
 
 /* ---- storage layer (swap for a real backend later) ---- */
 function dbGet(key, fallback){ try{ const v=localStorage.getItem(key); return v?JSON.parse(v):fallback; }catch(e){ return fallback; } }
-function dbSet(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ console.error(e); } }
+function dbSet(key, val){
+  try{
+    localStorage.setItem(key, JSON.stringify(val));
+  }catch(e){
+    // Browser local storage is full (usually from image data). This is only an
+    // offline cache — the real data lives in Supabase — so a failure here must
+    // never break a save. Free up room by dropping the big image-bearing keys
+    // from the local cache, then retry once. If it still won't fit, give up
+    // silently: the server copy is authoritative.
+    if(e && (e.name === "QuotaExceededError" || e.code === 22 || e.code === 1014)){
+      try{
+        ["pr_products","pr_home_links","pr_hero_slides","pr_cigar_brand_images"].forEach(k=>{
+          if(k !== key){ try{ localStorage.removeItem(k); }catch(_){} }
+        });
+        localStorage.setItem(key, JSON.stringify(val));
+      }catch(_){
+        // Still no room — that's fine. Local cache just won't hold this key.
+      }
+    }
+  }
+}
 
 const DEFAULT_HOME_LINKS = [
   { image: "", label: "Cigars", category: "Cigars" },
