@@ -172,6 +172,13 @@
     display:flex;align-items:center;}
   .hero-bg{position:absolute;inset:0;}
   .hero-bg img{width:100%;height:100%;object-fit:cover;opacity:.5;}
+  /* A slide with a photo but no text shows the image full and bright — no dim, no
+     overlay — and the box becomes square so the whole photo fits with no cropping. */
+  .hero-imageonly{min-height:0;aspect-ratio:1/1;}
+  .hero-imageonly .hero-bg{position:relative;inset:auto;width:100%;height:100%;}
+  .hero-imageonly .hero-bg img{opacity:1;object-fit:contain;background:#0f0d0b;}
+  .hero-imageonly .hero-bg::after{display:none;}
+  .hero-imageonly .hero-inner{display:none;}
   .hero-bg::after{content:"";position:absolute;inset:0;
     background:linear-gradient(90deg,rgba(22,19,16,.94) 0%,rgba(22,19,16,.72) 55%,rgba(22,19,16,.4) 100%);}
   .hero-inner{position:relative;padding:26px 22px 40px;max-width:78%;}
@@ -895,11 +902,11 @@ function renderStore(){
         ${["Home",...CATEGORIES].map(c=>`<button class="cat-btn ${STATE.category===c?'active':''}" data-act="setcat" data-val="${c}">${esc(c)}</button>`).join("")}
       </div>
 
-      <div class="hero">
+      <div class="hero${(slide.image && !slide.eyebrow && !slide.heading && !slide.sub && !slide.btn)?' hero-imageonly':''}">
         ${slide.image?`<div class="hero-bg"><img src="${esc(slide.image)}" alt=""/></div>`:""}
         <div class="hero-inner">
           ${slide.eyebrow?`<div class="hero-eyebrow"><span class="hero-rule"></span>${esc(slide.eyebrow)}</div>`:""}
-          <h2 class="hero-heading">${esc(slide.heading||"")}</h2>
+          ${slide.heading?`<h2 class="hero-heading">${esc(slide.heading)}</h2>`:""}
           ${slide.sub?`<p class="hero-sub">${esc(slide.sub)}</p>`:""}
           ${slide.btn?`<button class="hero-btn" data-act="homelinkgo" data-target="${esc(slide.target||"")}">${esc(slide.btn)}</button>`:""}
         </div>
@@ -1050,7 +1057,11 @@ const FORM_DRAFT = {};
 
 function draftOn(e){
   const el = e.target;
-  if(el && el.id && el.id.startsWith("pf-")) FORM_DRAFT[el.id] = el.value;
+  // Capture any admin form field with an id, so a re-render can't wipe an
+  // in-progress edit. Every admin input id is unique, so this is safe.
+  if(el && el.id && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT")){
+    FORM_DRAFT[el.id] = el.value;
+  }
 }
 document.addEventListener("input", draftOn, true);
 document.addEventListener("change", draftOn, true);
@@ -1059,6 +1070,16 @@ document.addEventListener("change", draftOn, true);
 function clearProductDraft(){
   Object.keys(FORM_DRAFT).forEach(k=>{ if(k.startsWith("pf-")) delete FORM_DRAFT[k]; });
   delete PENDING_IMAGES["pf-img"];
+}
+
+// Clear a specific field's draft once it's been saved.
+function clearDraft(prefix){
+  Object.keys(FORM_DRAFT).forEach(k=>{ if(k.startsWith(prefix)) delete FORM_DRAFT[k]; });
+}
+
+// Read a field's current value: draft (what was typed) wins over stored.
+function fieldVal(id, stored){
+  return FORM_DRAFT[id] !== undefined ? FORM_DRAFT[id] : (stored == null ? "" : stored);
 }
 
 const dv = (id, stored) => (FORM_DRAFT[id] !== undefined ? FORM_DRAFT[id] : (stored == null ? "" : stored));
@@ -1159,7 +1180,7 @@ function renderMembersAdmin(){
 function renderInvitesAdmin(){
   const list = Object.entries(STATE.invites).sort((a,b)=>(b[1].createdAt||0)-(a[1].createdAt||0));
   return `<div class="panel">
-    <div class="field"><label>New invite code</label><input id="new-invite-code" style="letter-spacing:2px;text-transform:uppercase" placeholder="e.g. WELCOME2026"/></div>
+    <div class="field"><label>New invite code</label><input id="new-invite-code" value="${esc(fieldVal('new-invite-code',''))}" style="letter-spacing:2px;text-transform:uppercase" placeholder="e.g. WELCOME2026"/></div>
     <button class="primary-btn" data-act="addinvite">＋ Add Code</button>
     <h3 class="section-label" style="margin-top:22px">Codes (${list.length})</h3>
     ${list.length===0?`<div class="empty">No invite codes yet.</div>`:""}
@@ -1285,15 +1306,15 @@ function renderCigarOriginsAdmin(){
   return `<div class="panel">
     <h3 class="section-label">Add New Origin</h3>
     <p class="cart-row-sub" style="margin-bottom:12px">e.g. type "Nicaraguan" to create a "Nicaraguan Cigars" button on the Cigars page. For any origin other than Cuban and Davidoff, customers go straight from the origin to products — just tag products with an Origin in the Products tab, no Brand needed.</p>
-    <div class="field"><label>Origin name</label><input id="new-origin-name" placeholder="e.g. Nicaraguan"/></div>
+    <div class="field"><label>Origin name</label><input id="new-origin-name" value="${esc(fieldVal('new-origin-name',''))}" placeholder="e.g. Nicaraguan"/></div>
     <button class="primary-btn" data-act="addorigin">+ Add Origin</button>
 
     <h3 class="section-label" style="margin-top:26px">Existing Origins</h3>
     ${Object.entries(origins).map(([dictKey, o])=>`
       <div style="border:1px solid var(--border);border-radius:5px;padding:14px;margin-bottom:14px">
         ${STATE.editingOriginKey === dictKey ? `
-          <div class="field"><label>Name (shown as "{name} Cigars")</label><input id="edit-origin-name-${esc(dictKey)}" value="${esc(o.key)}"/></div>
-          <div class="field"><label>Tagline (the gold line under the name)</label><input id="edit-origin-tag-${esc(dictKey)}" value="${esc(o.tagline||"")}" placeholder="e.g. Iconic. Authentic. Timeless."/></div>
+          <div class="field"><label>Name (shown as "{name} Cigars")</label><input id="edit-origin-name-${esc(dictKey)}" value="${esc(fieldVal(`edit-origin-name-${dictKey}`, o.key))}"/></div>
+          <div class="field"><label>Tagline (the gold line under the name)</label><input id="edit-origin-tag-${esc(dictKey)}" value="${esc(fieldVal(`edit-origin-tag-${dictKey}`, o.tagline||""))}" placeholder="e.g. Iconic. Authentic. Timeless."/></div>
           <div style="display:flex;gap:10px">
             <button class="primary-btn" data-act="saveorigineditor" data-val="${esc(dictKey)}">Save</button>
             <button class="ghost-btn" data-act="canceleditorigin">Cancel</button>
@@ -1628,6 +1649,7 @@ async function handleAction(e){
     if(!confirm("Delete this product? This can't be undone.")) return;
     STATE.products = STATE.products.filter(p=>p.id!==val);
     if(STATE.productForm===val) STATE.productForm=null;
+    clearDraft("new-origin-name");
     setState({}); flash("Product removed.");
   }
   else if(act==="saveproduct"){
@@ -1687,11 +1709,13 @@ async function handleAction(e){
   }
 
   else if(act==="addinvite"){
+    const draft = FORM_DRAFT["new-invite-code"];
     const input = document.getElementById("new-invite-code");
-    const code = (input ? input.value : "").trim().toUpperCase();
+    const code = ((draft !== undefined ? draft : (input ? input.value : "")) || "").trim().toUpperCase();
     if(!code){ flash("Type a code first.", "err"); return; }
     if(STATE.invites[code]){ flash("That code already exists.", "err"); return; }
     STATE.invites[code] = {used:false, createdAt:Date.now()};
+    clearDraft("new-invite-code");
     setState({});
     flash("Code added: " + code);
   }
@@ -1739,7 +1763,9 @@ async function handleAction(e){
   }
 
   else if(act==="addorigin"){
-    const name = document.getElementById("new-origin-name").value.trim();
+    const draftN = FORM_DRAFT["new-origin-name"];
+    const nEl = document.getElementById("new-origin-name");
+    const name = ((draftN !== undefined ? draftN : (nEl ? nEl.value : "")) || "").trim();
     if(!name) return flash("Enter an origin name.","err");
     let dictKey = name.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"");
     if(!dictKey) dictKey = "origin";
@@ -1757,11 +1783,14 @@ async function handleAction(e){
     setState({});
     flash("Origin deleted.");
   }
-  else if(act==="editorigin"){ STATE.editingOriginKey = val; render(); }
-  else if(act==="canceleditorigin"){ STATE.editingOriginKey = null; render(); }
+  else if(act==="editorigin"){ clearDraft(`edit-origin-name-${val}`); clearDraft(`edit-origin-tag-${val}`); STATE.editingOriginKey = val; render(); }
+  else if(act==="canceleditorigin"){ clearDraft("edit-origin-"); STATE.editingOriginKey = null; render(); }
   else if(act==="saveorigineditor"){
-    const input = document.getElementById(`edit-origin-name-${val}`);
-    const newName = input.value.trim();
+    // Read from the draft store (survives the refresh) with a DOM fallback.
+    const nameFromDom = document.getElementById(`edit-origin-name-${val}`);
+    const newName = (FORM_DRAFT[`edit-origin-name-${val}`] !== undefined
+                      ? FORM_DRAFT[`edit-origin-name-${val}`]
+                      : (nameFromDom ? nameFromDom.value : "")).trim();
     if(!newName) return flash("Enter an origin name.","err");
     const origin = STATE.cigarOrigins[val];
     const oldKey = origin.key;
@@ -1773,9 +1802,13 @@ async function handleAction(e){
           : p
       );
     }
-    const tagEl = document.getElementById(`edit-origin-tag-${val}`);
-    const tagline = tagEl ? tagEl.value.trim() : (origin.tagline||"");
+    const tagFromDom = document.getElementById(`edit-origin-tag-${val}`);
+    const tagline = (FORM_DRAFT[`edit-origin-tag-${val}`] !== undefined
+                      ? FORM_DRAFT[`edit-origin-tag-${val}`]
+                      : (tagFromDom ? tagFromDom.value : (origin.tagline||""))).trim();
     STATE.cigarOrigins = { ...STATE.cigarOrigins, [val]: { ...origin, key: newName, label: `${newName} Cigars`, tagline } };
+    clearDraft(`edit-origin-name-${val}`);
+    clearDraft(`edit-origin-tag-${val}`);
     STATE.editingOriginKey = null;
     setState({});
     flash("Origin updated.");
