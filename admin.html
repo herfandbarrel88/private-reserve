@@ -142,23 +142,18 @@
     border-top:1px solid var(--border);}
 
   /* --- Cigars: brand / line tiles (name sits on the photo, no label bar) --- */
-  .brand-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px;}
-  .brand-tile{position:relative;overflow:hidden;display:flex;align-items:flex-end;
-    aspect-ratio:1/1;width:100%;padding:0;border:1px solid var(--border);border-radius:4px;
-    background:var(--surface2);cursor:pointer;}
-  .brand-tile-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
-    filter:brightness(.88) saturate(1.05);}
-  .brand-tile-fallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-    font-size:24px;color:var(--muted2);}
-  .brand-tile-shade{position:absolute;inset:0;
-    background:linear-gradient(180deg,rgba(12,10,9,.06) 34%,rgba(12,10,9,.62) 72%,rgba(12,10,9,.93) 100%);}
-  .brand-tile-name{position:relative;z-index:2;width:100%;padding:10px 12px 11px;text-align:left;
-    font-family:"Boucherie Block",Georgia,serif;font-weight:normal;font-size:15px;
-    letter-spacing:.5px;text-transform:uppercase;color:#F4EFE4;line-height:1.15;}
-  /* Tiles whose artwork already carries the brand name: no fade, no label —
-     centre the logo instead of pushing it up for text that isn't there. */
-  .brand-tile.no-name{align-items:center;}
-  .brand-tile.no-name .brand-tile-img{object-fit:contain;background:#EEE9E0;}
+  .brand-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px;}
+  .brand-tile{display:flex;flex-direction:column;align-items:center;width:100%;padding:0 0 11px;
+    border:1px solid var(--border);border-radius:4px;background:#121212;cursor:pointer;overflow:hidden;}
+  .brand-tile-img{width:100%;aspect-ratio:4/3;overflow:hidden;background:#121212;
+    display:flex;align-items:center;justify-content:center;}
+  .brand-tile-img img{width:100%;height:100%;object-fit:contain;display:block;}
+  .brand-tile-fallback{font-size:40px;color:var(--muted2);opacity:.5;}
+  .brand-tile-name{font-family:"Boucherie Block",Georgia,serif;font-weight:normal;font-size:14px;
+    letter-spacing:.5px;text-transform:uppercase;color:var(--gold);line-height:1.15;
+    text-align:center;padding:10px 8px 9px;}
+  .brand-tile-btn{background:transparent;border:1px solid var(--gold);color:var(--gold);
+    font-family:'Montserrat',sans-serif;font-size:11px;font-weight:600;padding:7px 20px;border-radius:4px;}
 
   /* --- Cigars: section dividers (Premium Selection / Cigars Under $40) --- */
   .cigars-divider{display:flex;align-items:center;gap:14px;margin:22px 2px 14px;}
@@ -996,12 +991,10 @@ function renderCigarsPage(){
         <div class="brand-grid">
           ${byName(origin.brands).map(b=>{
             const img = (STATE.cigarBrandImages||{})[b] || "";
-            // Cuban brand artwork already carries the brand name, so no overlay.
-            const showName = nav.originKey !== "cuban";
-            return `<button class="brand-tile${showName?"":" no-name"}" data-act="cigarnav" data-val="brand" data-origin="${nav.originKey}" data-brand="${esc(b)}">
-              ${img?`<img class="brand-tile-img" src="${esc(img)}" alt=""/>`:`<span class="brand-tile-fallback">🚬</span>`}
-              ${showName?`<span class="brand-tile-shade"></span>
-              <span class="brand-tile-name">${esc(b)}</span>`:""}
+            return `<button class="brand-tile" data-act="cigarnav" data-val="brand" data-origin="${nav.originKey}" data-brand="${esc(b)}">
+              <div class="brand-tile-img">${img?`<img src="${esc(img)}" alt=""/>`:`<span class="brand-tile-fallback">🚬</span>`}</div>
+              <div class="brand-tile-name">${esc(b)}</div>
+              <span class="brand-tile-btn">View Collection</span>
             </button>`;
           }).join("")}
         </div>`;
