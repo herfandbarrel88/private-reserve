@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Private Reserve" />
-<meta name="theme-color" content="#161310" />
+<meta name="theme-color" content="#000000" />
 <meta name="color-scheme" content="dark" />
 <style>
   @font-face{
@@ -25,7 +25,7 @@
     font-display:swap;
   }
   :root{
-    --bg:#161310; --surface:#1C1916; --surface2:#121110; --border:#2A2622; --border2:#332E28;
+    --bg:#000000; --surface:#1C1916; --surface2:#121110; --border:#2A2622; --border2:#332E28;
     --text:#EAE3D6; --muted:#93897C; --muted2:#6B6153; --gold:#C9A15C; --oxblood:#8B3A2F;
     --good:#7fae82; --bad:#b6564a;
   }
@@ -51,12 +51,12 @@
   .gate-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
     background:radial-gradient(ellipse at top, #1E1916 0%, #121110 70%);}
   .gate-card{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--border2);
-    border-radius:6px;padding:30px 24px;box-shadow:0 20px 60px rgba(0,0,0,.5);}
+    border-radius:4px;padding:30px 24px;box-shadow:0 20px 60px rgba(0,0,0,.5);}
   .seal{width:64px;height:64px;margin:0 auto 14px;}
   .seal img{width:100%;height:100%;display:block;}
   .gate-title{font-family:"Boucherie Block",Georgia,serif;text-align:center;font-size:26px;letter-spacing:.5px;margin-bottom:6px;}
   .gate-sub{text-align:center;font-size:12.5px;color:var(--muted);margin-bottom:22px;line-height:1.5;}
-  .tab-row{display:flex;gap:4px;background:var(--surface2);border-radius:5px;padding:4px;margin-bottom:20px;}
+  .tab-row{display:flex;gap:4px;background:var(--surface2);border-radius:4px;padding:4px;margin-bottom:20px;}
   .tab-btn{flex:1;padding:8px 4px;background:transparent;border:none;color:var(--muted);font-size:11px;
     border-radius:4px;}
   .tab-btn.active{background:var(--border2);color:var(--text);}
@@ -76,27 +76,50 @@
 
   /* App shell */
   .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;
-    border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:5;gap:8px;}
+    border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:5;gap:16px;}
   .topbar-title-row{display:flex;align-items:center;gap:8px;min-width:0;flex:1;}
   .topbar-logo{width:28px;height:28px;flex-shrink:0;}
   .topbar-title-text{min-width:0;}
-  .topbar .title{font-family:"Boucherie Block",Georgia,serif;font-size:16px;white-space:nowrap;
+  .topbar .title{font-family:"Boucherie Block",Georgia,serif;font-size:13px;white-space:nowrap;
     overflow:hidden;text-overflow:ellipsis;}
   .topbar .subtitle{font-size:10.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .icon-btn{background:transparent;border:1px solid var(--border2);color:var(--text);border-radius:20px;
+  .icon-btn{background:transparent;border:1px solid var(--border2);color:var(--text);border-radius:4px;
     width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
   .cart-btn{display:flex;align-items:center;gap:5px;background:var(--border2);border:none;color:var(--text);
-    border-radius:20px;padding:7px 11px;font-size:12.5px;flex-shrink:0;}
+    border-radius:4px;padding:7px 11px;font-size:12.5px;flex-shrink:0;}
   .topbar-right{display:flex;align-items:center;gap:7px;flex-shrink:0;}
 
-  .content{padding:24px 16px 16px;}
-  .cat-row{display:flex;gap:8px;overflow-x:auto;margin-bottom:16px;padding-bottom:2px;}
-  .cat-btn{white-space:nowrap;background:transparent;border:1px solid var(--border2);color:var(--muted);
-    border-radius:20px;padding:7px 14px;font-size:12.5px;font-weight:600;}
-  .cat-btn.active{background:var(--gold);color:#161310;border-color:var(--gold);}
+  .content{padding:24px 16px 90px;}
 
-  .search-row{display:flex;gap:8px;margin-bottom:14px;}
-  .search-row input{flex:1;}
+  /* WhatsApp contact bar - fixed on every member page */
+  .wa-bar{position:fixed;left:0;right:0;bottom:0;max-width:520px;margin:0 auto;z-index:150;
+    background:#0A0806;border-top:1px solid var(--border);padding:10px 16px;
+    padding-bottom:calc(10px + env(safe-area-inset-bottom));}
+  .wa-btn{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;
+    background:transparent;color:#25D366;border:1px solid #25D366;border-radius:6px;padding:12px;
+    font-family:'Montserrat',sans-serif;font-weight:700;font-size:13.5px;letter-spacing:.3px;
+    text-decoration:none;cursor:pointer;}
+  .wa-btn svg{width:20px;height:20px;fill:#25D366;}
+  /* Category nav bar: icon + label, gold outline on active, one panel. */
+  .cat-row{display:flex;background:#141110;border:1px solid var(--border);border-radius:4px;
+    padding:6px;gap:4px;margin-bottom:16px;}
+  .cat-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:11px 3px;
+    border-radius:4px;border:1px solid transparent;background:transparent;color:#B7AD9F;
+    font-size:11.5px;font-weight:600;white-space:nowrap;cursor:pointer;}
+  .cat-btn svg{width:15px;height:15px;stroke:#B7AD9F;fill:none;stroke-width:1.7;flex-shrink:0;}
+  .cat-btn.active{border-color:var(--gold);color:#F4EFE4;font-weight:700;}
+  .cat-btn.active svg{stroke:var(--gold);}
+
+  .search-row{display:flex;gap:8px;margin-bottom:14px;align-items:stretch;}
+  .searchbar{flex:1;display:flex;align-items:center;gap:9px;background:#0C0A09;border:1px solid var(--border);
+    border-radius:6px;padding:11px 14px;}
+  .searchbar .search-ic{width:16px;height:16px;stroke:#8a8073;fill:none;stroke-width:2;flex-shrink:0;}
+  .searchbar input{flex:1;background:transparent;border:none;outline:none;color:var(--text);
+    font-family:'Montserrat',sans-serif;font-size:13px;padding:0;}
+  .searchbar input::placeholder{color:#6b6153;}
+  .search-clear{background:none;border:none;color:#8a8073;font-size:14px;cursor:pointer;padding:0 2px;}
+  .search-go{background:var(--gold);color:#161310;border:none;border-radius:6px;padding:0 16px;
+    font-family:'Montserrat',sans-serif;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap;}
 
   .origin-row{display:flex;flex-direction:column;gap:2px;margin-bottom:24px;}
   .origin-btn{text-align:left;background:transparent;border:none;border-bottom:1px solid var(--border);
@@ -108,7 +131,7 @@
     letter-spacing:.3px;padding:8px 12px;}
 
   .home-links-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
-  .home-link-box{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:0;
+  .home-link-box{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:0;
     overflow:hidden;text-align:left;color:var(--text);display:flex;flex-direction:column;}
   .home-link-img{aspect-ratio:1/1;width:100%;display:flex;align-items:center;justify-content:center;background:var(--text);
     color:#4A3A28;font-size:22px;overflow:hidden;padding:0;}
@@ -121,7 +144,7 @@
   /* --- Cigars: brand / line tiles (name sits on the photo, no label bar) --- */
   .brand-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px;}
   .brand-tile{position:relative;overflow:hidden;display:flex;align-items:flex-end;
-    aspect-ratio:1/1;width:100%;padding:0;border:1px solid var(--border);border-radius:7px;
+    aspect-ratio:1/1;width:100%;padding:0;border:1px solid var(--border);border-radius:4px;
     background:var(--surface2);cursor:pointer;}
   .brand-tile-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
     filter:brightness(.88) saturate(1.05);}
@@ -148,7 +171,7 @@
   /* --- Cigars: origin cards --- */
   .origin-list{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;}
   .origin-card{position:relative;overflow:hidden;display:block;width:100%;text-align:left;
-    background:#15120F;border:1px solid var(--border);border-radius:7px;
+    background:#15120F;border:1px solid var(--border);border-radius:4px;
     padding:15px 42px 15px 17px;color:var(--text);cursor:pointer;}
   .origin-card::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;
     background-image:repeating-linear-gradient(45deg,rgba(201,161,92,.05) 0 2px,transparent 2px 9px);}
@@ -167,7 +190,7 @@
     display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:15px;z-index:2;}
 
   /* --- Home: hero slider --- */
-  .hero{position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden;
+  .hero{position:relative;border:1px solid var(--border);border-radius:4px;overflow:hidden;
     background:linear-gradient(135deg,#1d1710 0%,#2a2118 55%,#181310 100%);margin-bottom:16px;min-height:230px;
     display:flex;align-items:center;}
   .hero-bg{position:absolute;inset:0;}
@@ -199,19 +222,35 @@
   .hero-dot.active{background:var(--gold);}
 
   /* --- Home: info strip --- */
-  .info-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);
-    border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:14px;}
-  .info-box{background:var(--surface);padding:12px 4px;text-align:center;}
-  .info-icon{font-size:15px;color:var(--gold);margin-bottom:5px;line-height:1;}
+  .info-strip{display:grid;grid-template-columns:repeat(4,1fr);background:#000;
+    border:1px solid var(--border);border-radius:4px;overflow:hidden;margin-bottom:22px;}
+  .info-box{padding:14px 4px;text-align:center;position:relative;}
+  .info-box:not(:last-child)::after{content:"";position:absolute;right:0;top:22%;bottom:22%;width:1px;background:var(--border);}
+  .info-ic{display:flex;align-items:center;justify-content:center;height:22px;margin-bottom:6px;}
+  .info-ic svg{width:20px;height:20px;stroke:var(--gold);fill:none;stroke-width:1.5;}
   .info-title{font-family:'Montserrat',sans-serif;font-size:8.5px;font-weight:700;letter-spacing:.3px;
-    text-transform:uppercase;color:var(--text);margin-bottom:3px;line-height:1.25;}
-  .info-sub{font-family:'Montserrat',sans-serif;font-size:8px;color:var(--muted);line-height:1.35;}
+    text-transform:uppercase;color:var(--text);margin-bottom:3px;line-height:1.2;}
+  .info-sub{font-family:'Montserrat',sans-serif;font-size:7.5px;color:var(--muted);line-height:1.3;}
+
+  /* Recommended for you */
+  .rec-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px;}
+  .rec-title{font-family:"Boucherie Block",Georgia,serif;font-size:17px;letter-spacing:.5px;text-transform:uppercase;color:var(--text);}
+  .rec-viewall{background:none;border:none;font-family:'Montserrat',sans-serif;font-size:11px;color:var(--gold);font-weight:600;cursor:pointer;}
+  .rec-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:20px;}
+  .rec-card{background:var(--surface);border:1px solid var(--border);border-radius:4px;overflow:hidden;padding:0;cursor:pointer;text-align:left;}
+  .rec-img{width:100%;aspect-ratio:1/1;background:#d9d9d9;display:flex;align-items:center;justify-content:center;font-size:22px;overflow:hidden;}
+  .rec-img img{width:100%;height:100%;object-fit:cover;}
+  .rec-body{padding:5px 5px 7px;}
+  .rec-name{font-family:'Montserrat',sans-serif;font-size:8px;color:var(--text);line-height:1.2;margin-bottom:3px;min-height:19px;}
+  .rec-price{font-family:'Montserrat',sans-serif;font-size:9.5px;font-weight:700;color:var(--gold);}
+
   @media(min-width:640px){
     .hero-heading{font-size:23px;}
     .info-box{padding:16px 10px;}
-    .info-icon{font-size:19px;}
     .info-title{font-size:11px;letter-spacing:.7px;}
     .info-sub{font-size:10.5px;}
+    .rec-name{font-size:10px;}
+    .rec-price{font-size:12px;}
   }
 
   .breadcrumb{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
@@ -221,7 +260,7 @@
   .crumb-current{color:var(--muted);}
 
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-  .p-card{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:6px;
+  .p-card{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:4px;
     padding:13px;display:flex;flex-direction:column;}
   .p-badge{position:absolute;top:10px;right:10px;font-size:9px;color:#8B6A3E;text-transform:uppercase;
     letter-spacing:.4px;}
@@ -247,11 +286,11 @@
   /* --- Product card: photo tap hint, single/box toggle, qty + add-to-cart --- */
   .p-img-tap{cursor:zoom-in;}
   .p-img-zoom{position:absolute;bottom:8px;right:8px;background:rgba(16,13,11,.68);color:#EAE3D6;
-    font-size:12px;line-height:1;padding:5px 7px;border-radius:14px;pointer-events:none;}
+    font-size:12px;line-height:1;padding:5px 7px;border-radius:4px;pointer-events:none;}
   .p-img-count{position:absolute;bottom:8px;left:8px;background:rgba(16,13,11,.68);color:#EAE3D6;
-    font-family:'Montserrat',sans-serif;font-size:9px;padding:4px 7px;border-radius:12px;pointer-events:none;}
+    font-family:'Montserrat',sans-serif;font-size:9px;padding:4px 7px;border-radius:4px;pointer-events:none;}
   .p-img{position:relative;}
-  .pv-seg{display:flex;border:1px solid var(--border2);border-radius:6px;overflow:hidden;margin-bottom:9px;}
+  .pv-seg{display:flex;border:1px solid var(--border2);border-radius:4px;overflow:hidden;margin-bottom:9px;}
   .pv-segbtn{flex:1;padding:7px 3px;background:var(--surface2);color:var(--muted);border:none;
     font-family:'Montserrat',sans-serif;font-size:10px;line-height:1.3;cursor:pointer;text-align:center;}
   .pv-segbtn span{font-weight:700;font-size:11px;}
@@ -259,12 +298,12 @@
   .pv-segbtn.on span{color:#1a140c;}
   .pv-priceline{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px;}
   .pv-priceline .p-price{font-size:17px;}
-  .pv-qty{display:flex;align-items:center;border:1px solid var(--border2);border-radius:6px;overflow:hidden;}
+  .pv-qty{display:flex;align-items:center;border:1px solid var(--border2);border-radius:4px;overflow:hidden;}
   .pv-qbtn{width:28px;height:32px;background:var(--surface2);color:var(--gold);border:none;font-size:16px;cursor:pointer;}
   .pv-qval{width:28px;text-align:center;font-family:'Montserrat',sans-serif;font-size:14px;font-weight:600;color:var(--text);}
-  .pv-addcart{width:100%;background:var(--gold);color:#1a140c;border:none;border-radius:6px;padding:11px;
+  .pv-addcart{width:100%;background:var(--gold);color:#1a140c;border:none;border-radius:4px;padding:11px;
     font-family:'Montserrat',sans-serif;font-weight:700;font-size:11.5px;letter-spacing:.7px;text-transform:uppercase;cursor:pointer;}
-  .pv-soldout{width:100%;background:transparent;color:var(--muted2);border:1px solid var(--border);border-radius:6px;
+  .pv-soldout{width:100%;background:transparent;color:var(--muted2);border:1px solid var(--border);border-radius:4px;
     padding:11px;text-align:center;font-family:'Montserrat',sans-serif;font-size:11.5px;}
 
   /* --- Photo viewer overlay --- */
@@ -273,7 +312,7 @@
   .pv-close{position:absolute;top:16px;right:16px;width:40px;height:40px;border-radius:50%;
     background:rgba(40,34,28,.85);color:#EAE3D6;border:none;font-size:19px;cursor:pointer;z-index:2;}
   .pv-stage{position:relative;width:86%;max-width:460px;display:flex;align-items:center;justify-content:center;}
-  .pv-bigimg{width:100%;aspect-ratio:1/1;object-fit:contain;background:#0f0d0b;border-radius:8px;}
+  .pv-bigimg{width:100%;aspect-ratio:1/1;object-fit:contain;background:#0f0d0b;border-radius:4px;}
   .pv-arrow{position:absolute;top:50%;transform:translateY(-50%);width:42px;height:42px;border-radius:50%;
     background:rgba(40,34,28,.72);color:#fff;border:none;font-size:22px;cursor:pointer;}
   .pv-arrow-l{left:8px;} .pv-arrow-r{right:8px;}
@@ -282,10 +321,10 @@
   .pv-dot{width:9px;height:9px;border-radius:50%;border:none;background:rgba(201,161,92,.35);cursor:pointer;padding:0;}
   .pv-dot.on{background:var(--gold);}
 
-  .panel{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:18px;margin-top:4px;}
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:18px;margin-top:4px;}
   .panel-title{font-size:18px;margin:4px 0 12px;}
   .back-link{display:block;width:100%;background:var(--gold);border:1px solid var(--gold);color:#161310;
-    font-size:16px;font-weight:700;padding:13px 16px;margin-bottom:14px;border-radius:6px;text-align:left;}
+    font-size:16px;font-weight:700;padding:13px 16px;margin-bottom:14px;border-radius:4px;text-align:left;}
   .section-label{font-size:11.5px;color:var(--gold);letter-spacing:.5px;text-transform:uppercase;
     margin:18px 0 10px;}
   .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
@@ -305,7 +344,7 @@
 
   .admin-tabs{display:flex;gap:6px;overflow-x:auto;padding:12px 16px 0;}
   .admin-tab{white-space:nowrap;background:transparent;border:1px solid var(--border2);color:var(--muted);
-    border-radius:20px;padding:7px 14px;font-size:12px;}
+    border-radius:4px;padding:7px 14px;font-size:12px;}
   .admin-tab.active{background:var(--gold);color:#161310;border-color:var(--gold);}
 
   .table-row{display:flex;align-items:center;gap:8px;padding:12px 0;border-bottom:1px solid var(--border);
@@ -314,12 +353,12 @@
   .sm-btn{background:transparent;border:1px solid var(--border2);color:var(--text);border-radius:4px;
     padding:6px 10px;font-size:11px;}
 
-  .order-card{border:1px solid var(--border);border-radius:5px;padding:13px;margin-bottom:10px;}
+  .order-card{border:1px solid var(--border);border-radius:4px;padding:13px;margin-bottom:10px;}
   .order-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;}
   .order-items{font-size:11.5px;color:var(--muted);margin:8px 0 0;padding-left:18px;}
 
   .toast{position:fixed;top:max(14px, env(safe-area-inset-top));left:50%;transform:translateX(-50%);
-    z-index:50;color:var(--text);padding:10px 16px;border-radius:5px;font-size:13px;
+    z-index:50;color:var(--text);padding:10px 16px;border-radius:4px;font-size:13px;
     box-shadow:0 8px 24px rgba(0,0,0,.4);white-space:nowrap;}
 
   .install-banner{position:fixed;bottom:0;left:0;right:0;background:var(--gold);color:#161310;
@@ -702,6 +741,16 @@ function render(){
       }catch(e){}
     }
   }
+
+  // If we just jumped to a cigar from Recommended, scroll it into view.
+  if(STATE.scrollToProduct){
+    const target = STATE.scrollToProduct;
+    STATE.scrollToProduct = null;
+    setTimeout(()=>{
+      const el = document.getElementById("prod-"+target);
+      if(el) el.scrollIntoView({behavior:"smooth", block:"center"});
+    }, 60);
+  }
 }
 
 // Safety net: after any render, put every in-progress draft value back into its
@@ -760,6 +809,12 @@ function renderApp(){
     </div>
     <div id="install-banner"></div>
     ${renderPhotoViewer()}
+    ${s.type==='member' ? `<div class="wa-bar">
+      <a class="wa-btn" href="https://wa.me/61414790053" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24"><path d="M17.5 14.4c-.3-.15-1.7-.85-2-.95-.25-.1-.45-.15-.6.15-.2.3-.7.95-.85 1.1-.15.2-.3.2-.6.05-.3-.15-1.25-.45-2.4-1.5-.9-.8-1.5-1.75-1.65-2.05-.15-.3 0-.45.15-.6.15-.15.3-.35.45-.55.15-.2.2-.3.3-.5.1-.2.05-.4-.05-.55-.1-.15-.6-1.5-.85-2.05-.2-.5-.4-.45-.6-.45h-.5c-.2 0-.5.05-.75.35-.25.3-1 .95-1 2.35s1.05 2.75 1.2 2.9c.15.2 2.05 3.1 4.95 4.35.7.3 1.25.5 1.65.65.7.2 1.35.2 1.85.1.55-.05 1.7-.7 1.95-1.35.25-.65.25-1.2.15-1.35-.1-.1-.3-.2-.6-.35zM12 2a10 10 0 0 0-8.5 15.3L2 22l4.8-1.5A10 10 0 1 0 12 2z"/></svg>
+        Chat with us on WhatsApp
+      </a>
+    </div>` : ""}
   `;
 }
 
@@ -850,7 +905,7 @@ function productCard(p){
       <button class="pv-addcart" data-act="addcartqty" data-val="${p.id}" data-variant="${hasBox?sel:'single'}">Add to Cart</button>`;
 
   return `
-    <div class="p-card">
+    <div class="p-card" id="prod-${p.id}">
       <div class="p-img${hasPhoto?' p-img-tap':''}" ${hasPhoto?`data-act="viewphotos" data-val="${p.id}"`:""}>${imgInner}</div>
       <div class="p-title">${esc(p.name)}</div>
       <div class="p-desc">${esc(p.description)}</div>
@@ -882,9 +937,7 @@ function cigarBreadcrumb(){
 }
 
 function cigarCatRow(){
-  return `<div class="cat-row">
-    ${["Home",...CATEGORIES].map(c=>`<button class="cat-btn ${STATE.category===c?'active':''}" data-act="setcat" data-val="${c}">${esc(c)}</button>`).join("")}
-  </div>`;
+  return `${catNav()}`;
 }
 
 function renderCigarsPage(){
@@ -1000,8 +1053,69 @@ function renderCigarsPage(){
 
 function searchBar(){
   return `<div class="search-row">
-    <input type="search" id="search-input" placeholder="Search products…" value="${esc(STATE.searchQuery||"")}"/>
-    ${STATE.searchQuery ? `<button class="icon-btn" data-act="clearsearch" title="Clear">✕</button>` : `<button class="icon-btn" data-act="dosearch" title="Search">🔍</button>`}
+    <div class="searchbar">
+      <svg viewBox="0 0 24 24" class="search-ic"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input type="search" id="search-input" placeholder="Search cigars, brands, or collections…" value="${esc(STATE.searchQuery||"")}"/>
+      ${STATE.searchQuery ? `<button class="search-clear" data-act="clearsearch" title="Clear">✕</button>` : ""}
+    </div>
+    <button class="search-go" data-act="dosearch" title="Search">Search</button>
+  </div>`;
+}
+
+function renderInfoStrip(){
+  const items = [
+    { t:"Free Delivery", s:"Orders over $300", ic:'<svg viewBox="0 0 24 24"><rect x="1" y="6" width="13" height="10" rx="1"/><path d="M14 9h4l3 3v4h-7z"/><circle cx="5.5" cy="17.5" r="1.8"/><circle cx="17.5" cy="17.5" r="1.8"/></svg>' },
+    { t:"Authentic", s:"100% genuine", ic:'<svg viewBox="0 0 24 24"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5z"/><path d="M9 12l2 2 4-4"/></svg>' },
+    { t:"Premium", s:"Expertly selected", ic:'<svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.3 6.6.6-5 4.4 1.5 6.5L12 17l-5.9 3.3 1.5-6.5-5-4.4 6.6-.6z"/></svg>' },
+    { t:"Secure", s:"Encrypted checkout", ic:'<svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>' },
+  ];
+  return `<div class="info-strip">
+    ${items.map(b=>`<div class="info-box">
+      <div class="info-ic">${b.ic}</div>
+      <div class="info-title">${esc(b.t)}</div>
+      <div class="info-sub">${esc(b.s)}</div>
+    </div>`).join("")}
+  </div>`;
+}
+
+// Recommended: 4 random cigars, fixed until the product list changes. We seed the
+// shuffle from the cigar ids so it stays the same between renders but reshuffles
+// when products are added/removed.
+function renderRecommended(){
+  const cigars = STATE.products.filter(p=>p.category==="Cigars" && p.stock>0);
+  if(cigars.length===0) return "";
+  const seed = cigars.map(p=>p.id).join("|");
+  let h=0; for(let i=0;i<seed.length;i++){ h=(h*31 + seed.charCodeAt(i))>>>0; }
+  const arr=[...cigars];
+  for(let i=arr.length-1;i>0;i--){ h=(h*1103515245+12345)>>>0; const j=h%(i+1); [arr[i],arr[j]]=[arr[j],arr[i]]; }
+  const pick = arr.slice(0,4);
+  return `
+    <div class="rec-head">
+      <span class="rec-title">Recommended For You</span>
+      <button class="rec-viewall" data-act="setcat" data-val="Cigars">View all ›</button>
+    </div>
+    <div class="rec-row">
+      ${pick.map(p=>`
+        <button class="rec-card" data-act="gotocigar" data-val="${p.id}">
+          <div class="rec-img">${p.image?`<img src="${esc(p.image)}"/>`:`<span>🚬</span>`}</div>
+          <div class="rec-body">
+            <div class="rec-name">${esc(p.name)}</div>
+            <div class="rec-price">${money(p.price)}</div>
+          </div>
+        </button>`).join("")}
+    </div>`;
+}
+
+function catNav(){
+  const icons = {
+    Home: '<svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>',
+    Cigars: '<svg viewBox="0 0 24 24"><rect x="2" y="9" width="20" height="6" rx="1"/><path d="M17 9v6M20 9v6"/></svg>',
+    Spirits: '<svg viewBox="0 0 24 24"><path d="M7 3h10l-1 8a4 4 0 0 1-8 0z"/><path d="M12 15v5M8 21h8"/></svg>',
+    Accessories: '<svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="11" rx="1"/><path d="M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>',
+  };
+  const label = c => c === "Accessories" ? "Access." : c;
+  return `<div class="cat-row">
+    ${["Home",...CATEGORIES].map(c=>`<button class="cat-btn ${STATE.category===c?'active':''}" data-act="setcat" data-val="${c}">${icons[c]||""}${esc(label(c))}</button>`).join("")}
   </div>`;
 }
 
@@ -1019,9 +1133,7 @@ function renderStore(){
       ));
       body = `
       ${searchBar()}
-      <div class="cat-row">
-        ${["Home",...CATEGORIES].map(c=>`<button class="cat-btn ${STATE.category===c?'active':''}" data-act="setcat" data-val="${c}">${esc(c)}</button>`).join("")}
-      </div>
+      ${catNav()}
       <h3 class="section-label" style="margin:4px 0 10px">Results for "${esc(STATE.searchQuery)}" (${results.length})</h3>
       <div class="grid">
         ${results.map(p=>productCard(p)).join("") || `<div class="empty" style="grid-column:1/-1">No products match that search.</div>`}
@@ -1033,9 +1145,7 @@ function renderStore(){
       const slide = slides[hi] || slides[0];
       body = `
       ${searchBar()}
-      <div class="cat-row">
-        ${["Home",...CATEGORIES].map(c=>`<button class="cat-btn ${STATE.category===c?'active':''}" data-act="setcat" data-val="${c}">${esc(c)}</button>`).join("")}
-      </div>
+      ${catNav()}
 
       <div class="hero${(slide.image && !slide.eyebrow && !slide.heading && !slide.sub && !slide.btn)?' hero-imageonly':''}">
         ${slide.image?`<div class="hero-bg"><img src="${esc(slide.image)}" alt=""/></div>`:""}
@@ -1052,6 +1162,8 @@ function renderStore(){
         </div>`:""}
       </div>
 
+      ${renderInfoStrip()}
+
       <div class="home-links-grid">
         ${links.map((l)=>{
           const target = l.target || (l.category ? `category:${l.category}` : "");
@@ -1062,16 +1174,7 @@ function renderStore(){
         }).join("")}
       </div>
 
-      <div class="info-strip">
-        ${INFO_BOXES.map(b=>`
-          <div class="info-box">
-            <div class="info-icon">${b.icon}</div>
-            <div class="info-title">${esc(b.title)}</div>
-            <div class="info-sub">${esc(b.sub)}</div>
-          </div>`).join("")}
-      </div>
-
-      <div class="home-footer">Cigar Brothers — Contact us 0414790053</div>
+      ${renderRecommended()}
       `;
     } else if(STATE.category === "Cigars"){
       body = searchBar() + renderCigarsPage();
@@ -1079,9 +1182,7 @@ function renderStore(){
       const visible = productsByName(STATE.products.filter(p=>p.category===STATE.category));
       body = `
       ${searchBar()}
-      <div class="cat-row">
-        ${["Home",...CATEGORIES].map(c=>`<button class="cat-btn ${STATE.category===c?'active':''}" data-act="setcat" data-val="${c}">${esc(c)}</button>`).join("")}
-      </div>
+      ${catNav()}
       <div class="grid">
         ${visible.map(p=>productCard(p)).join("") || `<div class="empty" style="grid-column:1/-1">Nothing in this category yet.</div>`}
       </div>`;
@@ -1410,7 +1511,7 @@ function renderHomePageAdmin(){
     <h3 class="section-label">Home Page Slider</h3>
     <p class="cart-row-sub" style="margin-bottom:14px">The large box at the top of the Home tab. It rotates through these slides automatically.</p>
     ${slides.map((sl,i)=>`
-      <div style="border:1px solid var(--border);border-radius:5px;padding:12px;margin-bottom:12px">
+      <div style="border:1px solid var(--border);border-radius:4px;padding:12px;margin-bottom:12px">
         <div class="section-label" style="margin-top:0">Slide ${i+1}</div>
         <div class="field"><label>Small label above the heading</label><input id="hs-eyebrow-${i}" data-hs-field="eyebrow" data-hs-index="${i}" value="${esc(fieldVal(`hs-eyebrow-${i}`, sl.eyebrow||""))}" placeholder="e.g. PREMIUM CIGARS"/></div>
         <div class="field"><label>Heading</label><input id="hs-heading-${i}" data-hs-field="heading" data-hs-index="${i}" value="${esc(fieldVal(`hs-heading-${i}`, sl.heading||""))}" placeholder="e.g. Elevate Your Experience."/></div>
@@ -1427,7 +1528,7 @@ function renderHomePageAdmin(){
     ${links.map((l,i)=>{
       const selectedTarget = l.target || (l.category ? `category:${l.category}` : "");
       return `
-      <div style="border:1px solid var(--border);border-radius:5px;padding:12px;margin-bottom:12px">
+      <div style="border:1px solid var(--border);border-radius:4px;padding:12px;margin-bottom:12px">
         <div class="section-label" style="margin-top:0">Box ${i+1}</div>
         <div class="field"><label>Label</label><input id="hl-label-${i}" data-hl-field="label" data-hl-index="${i}" value="${esc(fieldVal(`hl-label-${i}`, l.label))}" placeholder="e.g. New Arrivals"/></div>
         ${imageField(`hl-img-${i}`, l.image, "Photo")}
@@ -1450,7 +1551,7 @@ function renderCigarOriginsAdmin(){
 
     <h3 class="section-label" style="margin-top:26px">Existing Origins</h3>
     ${Object.entries(origins).map(([dictKey, o])=>`
-      <div style="border:1px solid var(--border);border-radius:5px;padding:14px;margin-bottom:14px">
+      <div style="border:1px solid var(--border);border-radius:4px;padding:14px;margin-bottom:14px">
         ${STATE.editingOriginKey === dictKey ? `
           <div class="field"><label>Name (shown as "{name} Cigars")</label><input id="edit-origin-name-${esc(dictKey)}" value="${esc(fieldVal(`edit-origin-name-${dictKey}`, o.key))}"/></div>
           <div class="field"><label>Tagline (the gold line under the name)</label><input id="edit-origin-tag-${esc(dictKey)}" value="${esc(fieldVal(`edit-origin-tag-${dictKey}`, o.tagline||""))}" placeholder="e.g. Iconic. Authentic. Timeless."/></div>
@@ -1695,6 +1796,15 @@ async function handleAction(e){
   }
   else if(act==="navback"){ history.back(); }
 
+  else if(act==="gotocigar"){
+    const p = STATE.products.find(pp=>pp.id===val);
+    if(!p) return;
+    STATE.category = "Cigars";
+    STATE.storeScreen = "shop";
+    STATE.searchQuery = "";
+    STATE.scrollToProduct = val; // renderStore scrolls to it after render
+    render();
+  }
   else if(act==="cardvariant"){
     STATE.cardVariant[val] = el.dataset.variant;
     render();
