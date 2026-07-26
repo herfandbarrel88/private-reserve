@@ -830,12 +830,12 @@ function renderPhotoViewer(){
   return `
     <div class="pv-overlay" data-act="closeviewer">
       <button class="pv-close" data-act="closeviewer" aria-label="Close">✕</button>
-      <div class="pv-stage" onclick="event.stopPropagation()">
+      <div class="pv-stage">
         ${multi?`<button class="pv-arrow pv-arrow-l" data-act="viewernav" data-delta="-1" aria-label="Previous">‹</button>`:""}
-        <img class="pv-bigimg" src="${esc(photos[i])}" alt=""/>
+        <img class="pv-bigimg" src="${esc(photos[i])}" alt="" data-act="closeviewer"/>
         ${multi?`<button class="pv-arrow pv-arrow-r" data-act="viewernav" data-delta="1" aria-label="Next">›</button>`:""}
       </div>
-      ${multi?`<div class="pv-hint">Swipe or tap the arrows to see more</div>
+      ${multi?`<div class="pv-hint">Tap the arrows to see more · tap photo to close</div>
       <div class="pv-dots">${photos.map((_,d)=>`<button class="pv-dot ${d===i?'on':''}" data-act="viewerdot" data-val="${d}"></button>`).join("")}</div>`:""}
     </div>`;
 }
