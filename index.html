@@ -171,14 +171,14 @@
   /* --- Cigars: origin cards --- */
   .origin-list{display:flex;flex-direction:column;gap:8px;margin-bottom:18px;}
   .origin-card{position:relative;overflow:hidden;display:block;width:100%;text-align:left;
-    background:#15120F;border:1px solid var(--border);border-radius:4px;
+    background:#050505;border:1px solid var(--border);border-radius:4px;
     padding:15px 42px 15px 17px;color:var(--text);cursor:pointer;}
   .origin-card::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;
     background-image:repeating-linear-gradient(45deg,rgba(201,161,92,.05) 0 2px,transparent 2px 9px);}
-  /* Rows cycle through three tones so a long list doesn't read as one flat block. */
-  .origin-card.tone-a{background:#1A1613;}
-  .origin-card.tone-b{background:#100E0C;}
-  .origin-card.tone-c{background:#151210;}
+  /* Rows cycle through three near-black tones so a long list doesn't read as one flat block. */
+  .origin-card.tone-a{background:#060606;}
+  .origin-card.tone-b{background:#000000;}
+  .origin-card.tone-c{background:#080808;}
   .origin-card.tone-c::before{opacity:.28;}
   .origin-card-name{position:relative;z-index:2;display:block;
     font-family:"Boucherie Block",Georgia,serif;font-size:19px;font-weight:normal;
