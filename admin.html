@@ -3,16 +3,16 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
-<title>Private Reserve — Admin</title>
+<title>Private Reserve — Back Office</title>
 <meta name="description" content="Members-only cigars, spirits & accessories" />
-<link rel="manifest" href="admin-manifest.json" />
+<link rel="manifest" href="manifest.json" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="apple-touch-icon" href="apple-touch-icon.png" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="PR Admin" />
+<meta name="apple-mobile-web-app-title" content="Reserve Admin" />
 <meta name="theme-color" content="#000000" />
 <meta name="color-scheme" content="dark" />
 <style>
@@ -43,7 +43,11 @@
   input,select,textarea{background:var(--surface2);border:1px solid var(--border2);color:var(--text);
     border-radius:4px;padding:11px 12px;width:100%;outline:none;}
   input:focus,select:focus,textarea:focus{border-color:var(--gold);}
-  button{cursor:pointer;}
+  /* appearance:none stops iOS/Android substituting their own grey control
+     background on <button> elements — that's what put a grey band across the
+     bottom of the brand tiles on phone but not on tablet/desktop. Every button
+     in this app sets its own background, so nothing else changes visually. */
+  button{cursor:pointer;-webkit-appearance:none;appearance:none;background-image:none;}
   .app{max-width:520px;margin:0 auto;min-height:100vh;position:relative;}
   .hidden{display:none !important;}
 
@@ -143,12 +147,17 @@
 
   /* --- Cigars: brand / line tiles (name sits on the photo, no label bar) --- */
   .brand-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px;}
-  .brand-tile{display:flex;flex-direction:column;align-items:center;width:100%;padding:0 0 11px;
-    border:1px solid var(--border);border-radius:4px;background:#121212;cursor:pointer;overflow:hidden;}
+  .brand-tile{display:flex;flex-direction:column;align-items:center;width:100%;padding:0;
+    border:1px solid var(--border);border-radius:4px;background:#121212;cursor:pointer;overflow:hidden;
+    -webkit-appearance:none;appearance:none;}
   .brand-tile-img{width:100%;aspect-ratio:4/3;overflow:hidden;background:#121212;
     display:flex;align-items:center;justify-content:center;}
   .brand-tile-img img{width:100%;height:100%;object-fit:contain;display:block;}
   .brand-tile-fallback{font-size:40px;color:var(--muted2);opacity:.5;}
+  /* The lower half of the tile is its own element with its own background, so
+     even if a browser ignores the button's background entirely, this covers it. */
+  .brand-tile-foot{width:100%;display:flex;flex-direction:column;align-items:center;
+    background:#121212;padding:0 0 11px;}
   .brand-tile-name{font-family:"Boucherie Block",Georgia,serif;font-weight:normal;font-size:14px;
     letter-spacing:.5px;text-transform:uppercase;color:var(--gold);line-height:1.15;
     text-align:center;padding:10px 8px 9px;}
@@ -377,7 +386,7 @@
 ============================================================ */
 
 const CATEGORIES = ["Cigars","Spirits","Accessories"];
-const SHOW_PROPRIETOR_TAB = true; // set to true in the owner's private admin.html copy only
+const SHOW_PROPRIETOR_TAB = true; // owner's private admin.html copy
 const DEFAULT_CIGAR_ORIGINS = {
   cuban: {
     key: "Cuban", label: "Cuban Cigars",
@@ -993,8 +1002,10 @@ function renderCigarsPage(){
             const img = (STATE.cigarBrandImages||{})[b] || "";
             return `<button class="brand-tile" data-act="cigarnav" data-val="brand" data-origin="${nav.originKey}" data-brand="${esc(b)}">
               <div class="brand-tile-img">${img?`<img src="${esc(img)}" alt=""/>`:`<span class="brand-tile-fallback">🚬</span>`}</div>
-              <div class="brand-tile-name">${esc(b)}</div>
-              <span class="brand-tile-btn">View Collection</span>
+              <div class="brand-tile-foot">
+                <div class="brand-tile-name">${esc(b)}</div>
+                <span class="brand-tile-btn">View Collection</span>
+              </div>
             </button>`;
           }).join("")}
         </div>`;
@@ -1020,9 +1031,11 @@ function renderCigarsPage(){
         ${lines.map(line=>{
           const sample = brandCigars.find(p=>p.cigarLine===line);
           return `<button class="brand-tile" data-act="cigarnav" data-val="line" data-line="${esc(line)}">
-            ${sample&&sample.image?`<img class="brand-tile-img" src="${esc(sample.image)}" alt=""/>`:`<span class="brand-tile-fallback">🚬</span>`}
-            <span class="brand-tile-shade"></span>
-            <span class="brand-tile-name">${esc(line)}</span>
+            <div class="brand-tile-img">${sample&&sample.image?`<img src="${esc(sample.image)}" alt=""/>`:`<span class="brand-tile-fallback">🚬</span>`}</div>
+            <div class="brand-tile-foot">
+              <div class="brand-tile-name">${esc(line)}</div>
+              <span class="brand-tile-btn">View Collection</span>
+            </div>
           </button>`;
         }).join("") || `<div class="empty" style="grid-column:1/-1">No lines added for ${esc(nav.brand)} yet — add products in the Back Office and tag them with this brand.</div>`}
       </div>`;
