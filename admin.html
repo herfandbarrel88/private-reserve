@@ -577,17 +577,25 @@ const PHOTO_BUCKET = "product-photos";
 async function uploadPhoto(dataUrl, prefix){
   const blob = await (await fetch(dataUrl)).blob();
   const name = `${prefix||"img"}_${Date.now().toString(36)}${Math.random().toString(36).slice(2,7)}.jpg`;
+  // Storage expects a form upload, not a raw body. Content-Type is deliberately
+  // left unset so the browser adds the multipart boundary itself.
+  const form = new FormData();
+  form.append("file", blob, name);
   const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${name}`, {
     method: "POST",
     headers: {
       "apikey": SUPABASE_ANON_KEY,
       "Authorization": "Bearer " + SUPABASE_ANON_KEY,
-      "Content-Type": blob.type || "image/jpeg",
       "x-upsert": "true",
     },
-    body: blob,
+    body: form,
   });
-  if(!res.ok) throw new Error("Photo upload failed: " + res.status);
+  if(!res.ok){
+    // Carry the server's own words through, so a failure says what's actually wrong.
+    let detail = "";
+    try{ detail = " — " + (await res.text()).slice(0,200); }catch(e){}
+    throw new Error(`Photo upload failed: ${res.status}${detail}`);
+  }
   return `${SUPABASE_URL}/storage/v1/object/public/${PHOTO_BUCKET}/${name}`;
 }
 
