@@ -367,6 +367,14 @@
   .table-row .flex2{flex:2;} .table-row .flex1{flex:1;}
   .sm-btn{background:transparent;border:1px solid var(--border2);color:var(--text);border-radius:4px;
     padding:6px 10px;font-size:11px;}
+  /* Catalog row: inline stock box + hide/show. Wraps on narrow screens. */
+  .prod-row{flex-wrap:wrap;}
+  .stock-inline{width:64px;padding:6px 7px;font-size:12px;text-align:center;}
+  .stock-inline.zero{color:var(--bad);border-color:var(--bad);}
+  .hidden-tag{display:inline-block;font-size:9px;color:var(--muted2);border:1px solid var(--border2);
+    border-radius:3px;padding:1px 5px;margin-left:6px;text-transform:uppercase;letter-spacing:.4px;
+    vertical-align:middle;}
+  .row-hidden{opacity:.45;}
 
   .order-card{border:1px solid var(--border);border-radius:4px;padding:13px;margin-bottom:10px;}
   .order-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;}
@@ -453,6 +461,8 @@ async function sbUpsert(key, value){
 const ACTION_KEYS = {
   saveproduct: ["pr_products"],
   delproduct: ["pr_products"],
+  togglehidden: ["pr_products"],
+  stockinline: ["pr_products"],
   togglemember: ["pr_members"],
   delmember: ["pr_members"],
   addinvite: ["pr_invites"],
@@ -536,6 +546,11 @@ async function pullShared(showFlash){
     return false;
   }
 }
+
+// Customer-facing views only ever see products that aren't hidden. The Back
+// Office keeps using STATE.products directly so nothing disappears from the
+// catalog list.
+function shopProducts(){ return STATE.products.filter(p=>!p.hidden); }
 
 const money = n => "$" + Number(n).toFixed(2);
 const byName = arr => arr.slice().sort((a,b)=>a.localeCompare(b, undefined, {sensitivity:"base", numeric:true}));
@@ -957,7 +972,7 @@ function cigarCatRow(){
 
 function renderCigarsPage(){
   const nav = STATE.cigarNav;
-  const cigars = STATE.products.filter(p=>p.category==="Cigars");
+  const cigars = shopProducts().filter(p=>p.category==="Cigars");
   const originKeys = Object.keys(STATE.cigarOrigins);
 
   if(nav.level === "root"){
@@ -1101,7 +1116,7 @@ function renderInfoStrip(){
 // shuffle from the cigar ids so it stays the same between renders but reshuffles
 // when products are added/removed.
 function renderRecommended(){
-  const cigars = STATE.products.filter(p=>p.category==="Cigars" && p.stock>0);
+  const cigars = shopProducts().filter(p=>p.category==="Cigars" && p.stock>0);
   if(cigars.length===0) return "";
   const seed = cigars.map(p=>p.id).join("|");
   let h=0; for(let i=0;i<seed.length;i++){ h=(h*31 + seed.charCodeAt(i))>>>0; }
@@ -1146,7 +1161,7 @@ function renderStore(){
   if(STATE.storeScreen === "shop"){
     if(STATE.searchQuery){
       const q = STATE.searchQuery.toLowerCase();
-      const results = productsByName(STATE.products.filter(p=>
+      const results = productsByName(shopProducts().filter(p=>
         p.name.toLowerCase().includes(q) ||
         (p.description||"").toLowerCase().includes(q)
       ));
@@ -1198,7 +1213,7 @@ function renderStore(){
     } else if(STATE.category === "Cigars"){
       body = searchBar() + renderCigarsPage();
     } else {
-      const visible = productsByName(STATE.products.filter(p=>p.category===STATE.category));
+      const visible = productsByName(shopProducts().filter(p=>p.category===STATE.category));
       body = `
       ${searchBar()}
       ${catNav()}
@@ -1386,11 +1401,13 @@ function renderProductsAdmin(){
       ${f?`<button class="ghost-btn" data-act="canceledit">Cancel</button>`:""}
     </div>
     <h3 class="section-label" style="margin-top:26px">Catalog (${STATE.products.length})</h3>
+    <p class="small-note" style="margin:-4px 0 12px">Type straight into the stock box to change it — it saves when you tap away. "Hide" removes an item from the customer app without deleting it.</p>
     ${productsByName(STATE.products).map(p=>`
-      <div class="table-row">
-        <div class="flex2"><div class="cart-row-name">${esc(p.name)}</div><div class="cart-row-sub">${esc(p.category)}${p.cigarBrand?" · "+esc(p.cigarBrand):""}${p.cigarLine?" · "+esc(p.cigarLine):""}</div></div>
+      <div class="table-row prod-row${p.hidden?' row-hidden':''}">
+        <div class="flex2"><div class="cart-row-name">${esc(p.name)}${p.hidden?`<span class="hidden-tag">Hidden</span>`:""}</div><div class="cart-row-sub">${esc(p.category)}${p.cigarBrand?" · "+esc(p.cigarBrand):""}${p.cigarLine?" · "+esc(p.cigarLine):""}</div></div>
         <div class="flex1">${money(p.price)}</div>
-        <div class="flex1" style="${p.stock===0?'color:var(--bad)':''}">${p.stock} in stock</div>
+        <input class="stock-inline${p.stock===0?' zero':''}" type="number" min="0" step="1" value="${esc(p.stock)}" data-act="stockinline" data-val="${p.id}" title="Stock on hand"/>
+        <button class="sm-btn" data-act="togglehidden" data-val="${p.id}">${p.hidden?"Show":"Hide"}</button>
         <button class="sm-btn" data-act="editproduct" data-val="${p.id}">Edit</button>
         <button class="sm-btn" data-act="delproduct" data-val="${p.id}">Del</button>
       </div>
@@ -1636,7 +1653,7 @@ function renderSettingsAdmin(){
 /* ================= EVENTS ================= */
 function bindEvents(){
   document.querySelectorAll("[data-act]").forEach(el=>{
-    el.addEventListener(el.tagName==="SELECT"?"change":"click", handleAction);
+    el.addEventListener((el.tagName==="SELECT"||el.tagName==="INPUT")?"change":"click", handleAction);
   });
   document.querySelectorAll('input[type="file"][data-img-target]').forEach(el=>{
     el.addEventListener("change", handleImageFile);
@@ -1650,7 +1667,7 @@ function bindEvents(){
 }
 
 const SHARED_MUTATING_ACTIONS = new Set([
-  "saveproduct","delproduct","togglemember","delmember","addinvite","revokeinvite",
+  "saveproduct","delproduct","togglehidden","stockinline","togglemember","delmember","addinvite","revokeinvite",
   "orderstatus","savehomelinks","addhomebox","delhomebox",
   "addorigin","delorigin","togglelines","addbrand","delbrand","savecigarbrands",
   "saveorigineditor",
@@ -1722,10 +1739,13 @@ async function handleAction(e){
   // actions we read the fields FIRST and hand the captured values to the handler.
   CURRENT_ACTION = act;
   let formSnapshot = null;
+  let stockSnapshot = null;
   if(act === "savehomelinks"){
     formSnapshot = readHomePageForm();
   } else if(act === "saveproduct"){
     formSnapshot = readProductForm();
+  } else if(act === "stockinline"){
+    stockSnapshot = el.value;   // read before pullShared() rebuilds the row
   }
   if(SHARED_MUTATING_ACTIONS.has(act) && ADMIN_PASSCODE){
     await pullShared(false);
@@ -1961,6 +1981,29 @@ async function handleAction(e){
 
   else if(act==="admintab"){ STATE.adminTab = val; STATE.productForm=null; render(); }
 
+  else if(act==="togglehidden"){
+    const p = STATE.products.find(pp=>pp.id===val);
+    if(!p) return;
+    const nowHidden = !p.hidden;
+    STATE.products = STATE.products.map(pp=>pp.id===val?{...pp, hidden: nowHidden}:pp);
+    setState({});
+    flash(nowHidden ? "Hidden from the customer app." : "Showing in the customer app.");
+  }
+  else if(act==="stockinline"){
+    const raw = (stockSnapshot !== null ? stockSnapshot : el.value).trim();
+    const n = parseInt(raw, 10);
+    if(raw === "" || isNaN(n) || n < 0){
+      flash("Stock must be a whole number, 0 or more.", "err");
+      render();   // put the previous value back in the box
+      return;
+    }
+    const p = STATE.products.find(pp=>pp.id===val);
+    if(!p) return;
+    if(p.stock === n) return;   // nothing actually changed
+    STATE.products = STATE.products.map(pp=>pp.id===val?{...pp, stock: n}:pp);
+    setState({});
+    flash(`${esc(p.name)} — stock set to ${n}.`);
+  }
   else if(act==="editproduct"){ clearProductDraft(); STATE.productForm = val; render(); }
   else if(act==="canceledit"){ clearProductDraft(); STATE.productForm = null; render(); }
   else if(act==="delproduct"){
