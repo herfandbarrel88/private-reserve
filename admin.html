@@ -440,13 +440,23 @@ function sbHeaders(extra){
     "Content-Type": "application/json"
   }, extra || {});
 }
+// One request per key rather than all eight at once, so a single oversized block
+// can't drag the rest of the app down with it — whatever loads, loads.
 async function sbFetchAll(){
-  const url = `${SUPABASE_URL}/rest/v1/app_data?select=key,value&key=in.(${SHARED_KEYS.join(",")})`;
-  const res = await fetch(url, { headers: sbHeaders() });
-  if(!res.ok) throw new Error("Supabase fetch failed: " + res.status);
-  const rows = await res.json();
+  const settled = await Promise.allSettled(SHARED_KEYS.map(async k => {
+    const url = `${SUPABASE_URL}/rest/v1/app_data?select=key,value&key=eq.${k}`;
+    const res = await fetch(url, { headers: sbHeaders() });
+    if(!res.ok) throw new Error(`${k}: ${res.status}`);
+    const rows = await res.json();
+    return rows.length ? [k, rows[0].value] : null;
+  }));
   const map = {};
-  rows.forEach(r => map[r.key] = r.value);
+  let anyOk = false;
+  settled.forEach(r => {
+    if(r.status === "fulfilled"){ anyOk = true; if(r.value) map[r.value[0]] = r.value[1]; }
+    else console.error("Supabase fetch failed —", r.reason);
+  });
+  if(!anyOk) throw new Error("Supabase fetch failed for every key");
   return map;
 }
 async function sbUpsert(key, value){
@@ -557,6 +567,30 @@ async function pullShared(showFlash){
 // catalog list.
 function shopProducts(){ return STATE.products.filter(p=>!p.hidden); }
 
+// ---- Photo storage ----------------------------------------------------
+// Photos used to be base64-encoded straight into the product record, which meant
+// every read and write moved the entire photo library. Past a few megabytes that
+// starts failing outright. Now a photo becomes a real file in Supabase Storage and
+// the record keeps only a short link.
+const PHOTO_BUCKET = "product-photos";
+
+async function uploadPhoto(dataUrl, prefix){
+  const blob = await (await fetch(dataUrl)).blob();
+  const name = `${prefix||"img"}_${Date.now().toString(36)}${Math.random().toString(36).slice(2,7)}.jpg`;
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${name}`, {
+    method: "POST",
+    headers: {
+      "apikey": SUPABASE_ANON_KEY,
+      "Authorization": "Bearer " + SUPABASE_ANON_KEY,
+      "Content-Type": blob.type || "image/jpeg",
+      "x-upsert": "true",
+    },
+    body: blob,
+  });
+  if(!res.ok) throw new Error("Photo upload failed: " + res.status);
+  return `${SUPABASE_URL}/storage/v1/object/public/${PHOTO_BUCKET}/${name}`;
+}
+
 const money = n => "$" + Number(n).toFixed(2);
 const byName = arr => arr.slice().sort((a,b)=>a.localeCompare(b, undefined, {sensitivity:"base", numeric:true}));
 const productsByName = arr => arr.slice().sort((a,b)=>a.name.localeCompare(b.name, undefined, {sensitivity:"base", numeric:true}));
@@ -600,11 +634,22 @@ function handleImageFile(e){
       canvas.width = w; canvas.height = h;
       canvas.getContext("2d").drawImage(img, 0, 0, w, h);
       const dataUrl = canvas.toDataURL("image/jpeg", 0.72);
-      PENDING_IMAGES[targetId] = dataUrl;   // survives any re-render until saved
-      const hidden = document.getElementById(targetId);
-      if(hidden) hidden.value = dataUrl;
-      const pv = document.getElementById(targetId+"-preview");
-      if(pv) pv.innerHTML = `<img src="${dataUrl}"/>`;
+      const pv0 = document.getElementById(targetId+"-preview");
+      if(pv0) pv0.innerHTML = `<span style="font-size:11px;color:var(--muted)">Uploading photo…</span>`;
+      // Upload first, then store only the link. If the upload fails we deliberately
+      // keep nothing — silently falling back to embedded data is what caused the
+      // size problem in the first place.
+      uploadPhoto(dataUrl, targetId).then(url => {
+        PENDING_IMAGES[targetId] = url;   // survives any re-render until saved
+        const hidden = document.getElementById(targetId);
+        if(hidden) hidden.value = url;
+        const pv = document.getElementById(targetId+"-preview");
+        if(pv) pv.innerHTML = `<img src="${esc(url)}"/>`;
+      }).catch(err => {
+        console.error(err);
+        const pv = document.getElementById(targetId+"-preview");
+        if(pv) pv.innerHTML = `<span style="font-size:11px;color:var(--bad)">Couldn't upload that photo — check your connection and pick it again.</span>`;
+      });
     };
     img.onerror = function(){ if(preview) preview.innerHTML = `<span style="font-size:11px;color:var(--bad)">Couldn't read that photo.</span>`; };
     img.src = ev.target.result;
@@ -688,6 +733,7 @@ let STATE = {
   toast: null,
   productForm: null, // editing product id or null
   editingOriginKey: null, // origin currently being renamed, or null
+  migrateMsg: null, // result line under the photo-migration button
 };
 if(!dbGet("pr_products", null)) dbSet("pr_products", SEED_PRODUCTS);
 if(!dbGet("pr_home_links", null)) dbSet("pr_home_links", DEFAULT_HOME_LINKS);
@@ -1663,7 +1709,29 @@ function renderSettingsAdmin(){
     <div class="field"><label>Current passcode</label><input id="set-pass-current" type="password" placeholder="••••••••"/></div>
     <div class="field"><label>New passcode</label><input id="set-pass-new" type="password" placeholder="4+ characters"/></div>
     <button class="primary-btn" data-act="savepass">Save Passcode</button>
+
+    <h3 class="section-label" style="margin-top:30px">Photo Storage</h3>
+    <p class="cart-row-sub" style="margin-bottom:12px">Photos added before this update are stored inside the product data itself, which makes saving slow and eventually makes it fail. This moves each one into file storage and leaves a link behind — nothing is lost and the app gets much lighter. Leave this page open while it runs. Safe to press again; it only touches photos that haven't moved yet.</p>
+    <button class="primary-btn" id="migrate-btn" data-act="migratephotos">Move Photos to Storage</button>
+    <div id="migrate-status" class="small-note" style="margin-top:10px;min-height:16px">${esc(STATE.migrateMsg||"")}</div>
   </div>`;
+}
+
+// Every photo still held as embedded data, and where it lives, so the migration
+// can put each link back in the right place afterwards.
+function collectEmbeddedPhotos(){
+  const isData = v => typeof v === "string" && v.startsWith("data:");
+  const jobs = [];
+  (STATE.products||[]).forEach((p,idx)=>{
+    if(isData(p.image))  jobs.push({kind:"product", idx, field:"image"});
+    if(isData(p.image2)) jobs.push({kind:"product", idx, field:"image2"});
+  });
+  Object.entries(STATE.cigarBrandImages||{}).forEach(([key,v])=>{
+    if(isData(v)) jobs.push({kind:"brand", key});
+  });
+  (STATE.heroSlides||[]).forEach((s,idx)=>{ if(isData(s.image)) jobs.push({kind:"hero", idx}); });
+  (STATE.homeLinks||[]).forEach((l,idx)=>{ if(isData(l.image)) jobs.push({kind:"home", idx}); });
+  return jobs;
 }
 
 /* ================= EVENTS ================= */
@@ -2137,6 +2205,63 @@ async function handleAction(e){
       flash("Passcode updated.");
       render();
     }).catch(()=>{ btn.disabled = false; flash("Couldn't reach the server. Try again.", "err"); });
+  }
+
+  else if(act==="migratephotos"){
+    const setMsg = t => { const b = document.getElementById("migrate-status"); if(b) b.textContent = t; };
+    const jobs = collectEmbeddedPhotos();
+    if(!jobs.length){
+      STATE.migrateMsg = "Nothing to move — every photo is already in storage.";
+      render();
+      return;
+    }
+    if(!confirm(`Move ${jobs.length} photo${jobs.length>1?"s":""} into storage?\n\nEach one is uploaded, then everything is saved once at the end. Keep this page open until it finishes.`)) return;
+
+    const btn0 = document.getElementById("migrate-btn");
+    if(btn0) btn0.disabled = true;
+
+    // Work on copies. Nothing touches STATE until every upload is done, so an
+    // interrupted run leaves the existing data exactly as it was.
+    const products = (STATE.products||[]).map(p=>({...p}));
+    const brands   = {...(STATE.cigarBrandImages||{})};
+    const heroes   = (STATE.heroSlides||[]).map(s=>({...s}));
+    const homes    = (STATE.homeLinks||[]).map(l=>({...l}));
+
+    let done = 0, failed = 0;
+    setMsg(`Starting — 0 of ${jobs.length}`);
+    for(const j of jobs){
+      let src = "";
+      if(j.kind==="product")    src = products[j.idx][j.field];
+      else if(j.kind==="brand") src = brands[j.key];
+      else if(j.kind==="hero")  src = heroes[j.idx].image;
+      else if(j.kind==="home")  src = homes[j.idx].image;
+      try{
+        const url = await uploadPhoto(src, j.kind);
+        if(j.kind==="product")    products[j.idx][j.field] = url;
+        else if(j.kind==="brand") brands[j.key] = url;
+        else if(j.kind==="hero")  heroes[j.idx].image = url;
+        else if(j.kind==="home")  homes[j.idx].image = url;
+      }catch(e){
+        console.error("photo migration failed for", j, e);
+        failed++;
+      }
+      done++;
+      setMsg(`Uploading — ${done} of ${jobs.length}${failed?` · ${failed} failed`:""}`);
+    }
+
+    setMsg("Uploads finished. Saving…");
+    STATE.products         = products;
+    STATE.cigarBrandImages = brands;
+    STATE.heroSlides       = heroes;
+    STATE.homeLinks        = homes;
+    // One small save at the end — by now the records hold links, not photo data,
+    // so this goes through where the old oversized writes were failing.
+    await pushShared(["pr_products","pr_cigar_brand_images","pr_hero_slides","pr_home_links"]);
+    const moved = done - failed;
+    STATE.migrateMsg = failed
+      ? `${moved} photo${moved===1?"":"s"} moved, ${failed} failed. Press the button again to retry the ones that didn't make it.`
+      : `Done — ${moved} photo${moved===1?"":"s"} moved to storage.`;
+    render();
   }
 
   else if(act==="savehomelinks"){
