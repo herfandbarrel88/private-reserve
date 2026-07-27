@@ -316,6 +316,9 @@
   .pv-qty{display:flex;align-items:center;border:1px solid var(--border2);border-radius:4px;overflow:hidden;}
   .pv-qbtn{width:24px;height:27px;background:var(--surface2);color:var(--gold);border:none;font-size:14px;cursor:pointer;}
   .pv-qval{width:24px;text-align:center;font-family:'Montserrat',sans-serif;font-size:12px;font-weight:600;color:var(--text);}
+  .pv-qbtn:disabled{opacity:.25;cursor:default;}
+  .pv-avail{font-family:'Montserrat',sans-serif;font-size:9px;color:var(--muted2);
+    text-align:right;margin:-4px 0 6px;}
   .pv-addcart{width:100%;background:var(--gold);color:#1a140c;border:none;border-radius:4px;padding:8px;
     font-family:'Montserrat',sans-serif;font-weight:700;font-size:10.5px;letter-spacing:.7px;text-transform:uppercase;cursor:pointer;}
   .pv-soldout{width:100%;background:transparent;color:var(--muted2);border:1px solid var(--border);border-radius:4px;
@@ -468,6 +471,8 @@ const ACTION_KEYS = {
   addinvite: ["pr_invites"],
   revokeinvite: ["pr_invites"],
   orderstatus: ["pr_orders","pr_products"],
+  delorder: ["pr_orders"],
+  cleardelivered: ["pr_orders"],
   savehomelinks: ["pr_home_links","pr_hero_slides"],
   addhomebox: ["pr_home_links"],
   delhomebox: ["pr_home_links"],
@@ -907,8 +912,10 @@ function productCard(p){
   // Which variant is selected for a box-price product (defaults to single).
   const sel = STATE.cardVariant[p.id] || "single";
   const activePrice = (hasBox && sel === "box") ? p.boxPrice : p.price;
-  // Quantity chosen on the card, before adding (always starts at 1).
-  const qty = STATE.cardQty[p.id] || 1;
+  // How many they can still add, allowing for what's already in their cart.
+  const available = Math.max(0, p.stock - totalInCart);
+  // Quantity chosen on the card, before adding — never above what's available.
+  const qty = Math.min(STATE.cardQty[p.id] || 1, Math.max(1, available));
 
   const imgInner = hasPhoto
     ? `<img src="${esc(photos[0])}" style="width:100%;height:100%;object-fit:cover"/>
@@ -924,14 +931,17 @@ function productCard(p){
 
   const buy = soldOut
     ? `<div class="pv-soldout">Sold Out</div>`
+    : available === 0
+    ? `<div class="pv-soldout">All ${p.stock} in your cart</div>`
     : `<div class="pv-priceline">
         <span class="p-price">${money(activePrice)}</span>
         <div class="pv-qty">
-          <button class="pv-qbtn" data-act="cardqty" data-val="${p.id}" data-delta="-1">−</button>
+          <button class="pv-qbtn" data-act="cardqty" data-val="${p.id}" data-delta="-1" ${qty<=1?'disabled':''}>−</button>
           <span class="pv-qval">${qty}</span>
-          <button class="pv-qbtn" data-act="cardqty" data-val="${p.id}" data-delta="1">+</button>
+          <button class="pv-qbtn" data-act="cardqty" data-val="${p.id}" data-delta="1" ${qty>=available?'disabled':''}>+</button>
         </div>
       </div>
+      <div class="pv-avail">${available} available</div>
       <button class="pv-addcart" data-act="addcartqty" data-val="${p.id}" data-variant="${hasBox?sel:'single'}">Add to Cart</button>`;
 
   return `
@@ -1406,7 +1416,7 @@ function renderProductsAdmin(){
       <div class="table-row prod-row${p.hidden?' row-hidden':''}">
         <div class="flex2"><div class="cart-row-name">${esc(p.name)}${p.hidden?`<span class="hidden-tag">Hidden</span>`:""}</div><div class="cart-row-sub">${esc(p.category)}${p.cigarBrand?" · "+esc(p.cigarBrand):""}${p.cigarLine?" · "+esc(p.cigarLine):""}</div></div>
         <div class="flex1">${money(p.price)}</div>
-        <input class="stock-inline${p.stock===0?' zero':''}" type="number" min="0" step="1" value="${esc(p.stock)}" data-act="stockinline" data-val="${p.id}" title="Stock on hand"/>
+        <input id="stk-${p.id}" class="stock-inline${p.stock===0?' zero':''}" type="number" min="0" step="1" value="${esc(dv(`stk-${p.id}`, p.stock))}" data-act="stockinline" data-val="${p.id}" title="Stock on hand"/>
         <button class="sm-btn" data-act="togglehidden" data-val="${p.id}">${p.hidden?"Show":"Hide"}</button>
         <button class="sm-btn" data-act="editproduct" data-val="${p.id}">Edit</button>
         <button class="sm-btn" data-act="delproduct" data-val="${p.id}">Del</button>
@@ -1417,17 +1427,23 @@ function renderProductsAdmin(){
 
 function renderOrdersAdmin(){
   const statuses = ["Awaiting payment","Received","Processing","Shipped","Delivered","Cancelled — delete order"];
+  const deliveredCount = STATE.orders.filter(o=>o.status==="Delivered").length;
   return `<div class="panel">
     <h3 class="section-label">Orders (${STATE.orders.length})</h3>
+    ${STATE.orders.length?`<p class="small-note" style="margin:-4px 0 12px">"Delete" clears an order from this list and leaves stock alone. To put stock back, use "Cancelled — delete order" in the status dropdown instead.</p>`:""}
+    ${deliveredCount?`<button class="sm-btn" data-act="cleardelivered" style="margin-bottom:14px">Clear ${deliveredCount} delivered order${deliveredCount>1?"s":""}</button>`:""}
     ${STATE.orders.length===0?`<div class="empty">No orders yet.</div>`:""}
     ${STATE.orders.map(o=>`
       <div class="order-card">
         <div class="order-head">
           <div><div class="cart-row-name">${esc(o.orderNo)} — ${money(o.total)}${o.paymentMethod==="Bank transfer"?` <span style="color:var(--gold);font-size:12px">· BANK TRANSFER</span>`:""}</div>
           <div class="cart-row-sub">${esc(o.memberName)} (${esc(o.memberEmail)})${o.phone?` · ${esc(o.phone)}`:""} · ${new Date(o.createdAt).toLocaleString()}</div></div>
-          <select data-act="orderstatus" data-val="${o.id}" style="width:140px">
-            ${statuses.map(st=>`<option ${o.status===st?'selected':''}>${st}</option>`).join("")}
-          </select>
+          <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex-shrink:0">
+            <select data-act="orderstatus" data-val="${o.id}" style="width:140px">
+              ${statuses.map(st=>`<option ${o.status===st?'selected':''}>${st}</option>`).join("")}
+            </select>
+            <button class="sm-btn" data-act="delorder" data-val="${o.id}" style="color:var(--bad);border-color:var(--bad)">Delete</button>
+          </div>
         </div>
         <div class="cart-row-sub">Ship to: ${esc(o.shipping.address)}, ${esc(o.shipping.city)}, ${esc(o.shipping.state)} ${esc(o.shipping.zip)} · ${esc(o.cardLast4)}</div>
         <ul class="order-items">${o.items.map(it=>`<li>${it.qty} × ${esc(it.name)}${it.variantLabel?` (${esc(it.variantLabel)})`:""} — ${money(it.price*it.qty)}</li>`).join("")}${o.deliveryFee!==undefined?`<li>Delivery — ${o.deliveryFee>0?money(o.deliveryFee):"FREE"}</li>`:""}</ul>
@@ -1668,7 +1684,7 @@ function bindEvents(){
 
 const SHARED_MUTATING_ACTIONS = new Set([
   "saveproduct","delproduct","togglehidden","stockinline","togglemember","delmember","addinvite","revokeinvite",
-  "orderstatus","savehomelinks","addhomebox","delhomebox",
+  "orderstatus","delorder","cleardelivered","savehomelinks","addhomebox","delhomebox",
   "addorigin","delorigin","togglelines","addbrand","delbrand","savecigarbrands",
   "saveorigineditor",
 ]);
@@ -1849,9 +1865,14 @@ async function handleAction(e){
     render();
   }
   else if(act==="cardqty"){
+    const p = STATE.products.find(pp=>pp.id===val);
+    if(!p) return;
+    const totalInCart = (STATE.cart[`${val}__single`]||0) + (STATE.cart[`${val}__box`]||0);
+    const available = Math.max(0, p.stock - totalInCart);
     const delta = parseInt(el.dataset.delta,10);
     const cur = STATE.cardQty[val] || 1;
-    const next = Math.max(1, cur + delta);
+    // Never let the stepper climb past what's actually on the shelf.
+    const next = Math.min(Math.max(1, cur + delta), Math.max(1, available));
     STATE.cardQty[val] = next;
     render();
   }
@@ -1993,12 +2014,14 @@ async function handleAction(e){
     const raw = (stockSnapshot !== null ? stockSnapshot : el.value).trim();
     const n = parseInt(raw, 10);
     if(raw === "" || isNaN(n) || n < 0){
+      clearDraft(`stk-${val}`);
       flash("Stock must be a whole number, 0 or more.", "err");
       render();   // put the previous value back in the box
       return;
     }
     const p = STATE.products.find(pp=>pp.id===val);
     if(!p) return;
+    clearDraft(`stk-${val}`);
     if(p.stock === n) return;   // nothing actually changed
     STATE.products = STATE.products.map(pp=>pp.id===val?{...pp, stock: n}:pp);
     setState({});
@@ -2055,6 +2078,20 @@ async function handleAction(e){
     setState({});
   }
 
+  else if(act==="delorder"){
+    const o = STATE.orders.find(oo=>oo.id===val);
+    if(!o) return;
+    if(!confirm(`Delete order ${o.orderNo} from the list?\n\nStock will NOT be changed. This can't be undone.`)) return;
+    STATE.orders = STATE.orders.filter(oo=>oo.id!==val);
+    setState({}); flash("Order deleted.");
+  }
+  else if(act==="cleardelivered"){
+    const n = STATE.orders.filter(o=>o.status==="Delivered").length;
+    if(!n) return;
+    if(!confirm(`Delete all ${n} delivered order${n>1?"s":""}?\n\nStock will NOT be changed. This can't be undone.`)) return;
+    STATE.orders = STATE.orders.filter(o=>o.status!=="Delivered");
+    setState({}); flash(`${n} delivered order${n>1?"s":""} deleted.`);
+  }
   else if(act==="togglemember"){
     const email = val;
     STATE.members[email] = {...STATE.members[email], active: !STATE.members[email].active};
@@ -2337,6 +2374,9 @@ boot();
 // Hero slider: advance every 6s, but only while the Home tab is actually on screen.
 setInterval(()=>{
   if(!STATE.session) return;
+  // Customer-only feature. Without this the Back Office silently redrew itself
+  // every 6s, wiping whatever was half-typed into a form field.
+  if(STATE.session.type !== "member") return;
   if(STATE.category !== "Home") return;
   if(STATE.storeScreen !== "shop") return;
   if(STATE.searchQuery) return;
