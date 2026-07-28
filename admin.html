@@ -803,7 +803,14 @@ if(!dbGet("pr_cigar_origins", null)) dbSet("pr_cigar_origins", STATE.cigarOrigin
 function persist(onlyKeys){
   dbSet("pr_session", STATE.session); // session stays local to this device on purpose
   if(ADMIN_PASSCODE){
-    const scoped = onlyKeys || (CURRENT_ACTION ? ACTION_KEYS[CURRENT_ACTION] : null);
+    const explicit = Array.isArray(onlyKeys) && onlyKeys.length ? onlyKeys : null;
+    const scoped = explicit || (CURRENT_ACTION ? ACTION_KEYS[CURRENT_ACTION] : null);
+    // Only actions that genuinely change shared data should write to the server.
+    // Logging in, switching tabs and opening a form all call setState too, and
+    // pushing everything back on those was both pointless and risky — it fired
+    // before members and orders had loaded, which is what set off the
+    // "haven't loaded yet" warning on every login.
+    if(!scoped) return;
     // Keep a handle on the save. pullShared() waits for this before fetching, so
     // a refresh triggered moments after an edit can't pull the pre-save value and
     // stamp it back over what the user just changed.
