@@ -6,12 +6,21 @@ const crypto = require("crypto");
 
 const SUPABASE_URL = "https://njlrcamdlghcvzkwpbff.supabase.co";
 const { getIdentifier, checkRateLimit, recordFailure, recordSuccess } = require("./rate-limit");
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qbHJjYW1kbGdoY3Z6a3dwYmZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1Nzg5MjIsImV4cCI6MjA5OTE1NDkyMn0.ul4nyNg2Lbwl3LKJ2qW6ogOw_xkgNYRwuAApOHO8CKI";
 
+// Reads use the service role key, not the public one. This function reads the
+// member list, and that list is no longer readable with the public key — it holds
+// names and email addresses, and the public key is visible in the page source.
 async function sbGet(key) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=value&key=eq.${key}`, {
-    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+    headers: {
+      apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+    },
   });
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(`Read failed for ${key} (${res.status}): ${detail.slice(0, 200)}`);
+  }
   const rows = await res.json();
   return rows[0] ? rows[0].value : null;
 }
@@ -47,6 +56,9 @@ function verifyPassword(password, stored) {
 
 exports.handler = async (event) => {
   if (event.httpMethod !== "POST") return { statusCode: 405, body: "Method not allowed" };
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return { statusCode: 500, body: JSON.stringify({ ok: false, error: "Server not configured yet — missing service role key." }) };
+  }
   try {
     const body = JSON.parse(event.body);
 
