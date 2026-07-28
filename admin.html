@@ -594,7 +594,7 @@ async function pullShared(showFlash){
       }catch(e){
         console.error("private fetch failed", e);
         PRIVATE_LOADED = false;
-        flash("Couldn't load members and orders — try Refresh, or log in again.", "err");
+        flash("Couldn't load members and orders — " + (e && e.message ? e.message : "unknown error"), "err");
       }
     }
     if(showFlash) flash("Refreshed.");
