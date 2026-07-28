@@ -5,6 +5,7 @@
 // only after the proprietor passcode has been verified.
 const SUPABASE_URL = "https://njlrcamdlghcvzkwpbff.supabase.co";
 const { getIdentifier, checkRateLimit, recordFailure, recordSuccess } = require("./rate-limit");
+const { verifyPasscode } = require("./passcode");
 
 // The only keys this function will ever hand back. Anything else is a coding
 // mistake, not a request to honour.
@@ -47,7 +48,7 @@ exports.handler = async (event) => {
     }
 
     const storedPasscode = (await sbGet("pr_admin_pass")) || "humidor21";
-    if (storedPasscode !== body.passcode) {
+    if (!verifyPasscode(body.passcode, storedPasscode)) {
       try { await recordFailure(RATE_KEY, identifier); } catch (e) {}
       return { statusCode: 403, body: JSON.stringify({ ok: false, error: "Passcode not accepted by admin-read." }) };
     }
