@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
 <title>Private Reserve — Back Office</title>
 <meta name="description" content="Members-only cigars, spirits & accessories" />
-<link rel="manifest" href="admin-manifest.json" />
+<link rel="manifest" href="manifest.json" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -431,7 +431,17 @@ const SEED_PRODUCTS = [
 
 const SUPABASE_URL = "https://njlrcamdlghcvzkwpbff.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qbHJjYW1kbGdoY3Z6a3dwYmZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1Nzg5MjIsImV4cCI6MjA5OTE1NDkyMn0.ul4nyNg2Lbwl3LKJ2qW6ogOw_xkgNYRwuAApOHO8CKI";
-const SHARED_KEYS = ["pr_products","pr_members","pr_invites","pr_orders","pr_home_links","pr_hero_slides","pr_cigar_brand_images","pr_cigar_origins"];
+// Anyone can read these — they're the shop itself, and the app needs them before
+// anyone signs in.
+const PUBLIC_KEYS = ["pr_products","pr_home_links","pr_hero_slides","pr_cigar_brand_images","pr_cigar_origins"];
+// These hold members' names, emails, phone numbers and delivery addresses. The
+// public key can no longer read them; they come through the admin-read function
+// after the passcode is checked.
+const PRIVATE_KEYS = ["pr_members","pr_invites","pr_orders"];
+const SHARED_KEYS = [...PUBLIC_KEYS, ...PRIVATE_KEYS];
+// Set once the private blocks have actually loaded this session. Guards against
+// saving an empty members/orders list over the real one if the read failed.
+let PRIVATE_LOADED = false;
 
 function sbHeaders(extra){
   return Object.assign({
@@ -443,7 +453,7 @@ function sbHeaders(extra){
 // One request per key rather than all eight at once, so a single oversized block
 // can't drag the rest of the app down with it — whatever loads, loads.
 async function sbFetchAll(){
-  const settled = await Promise.allSettled(SHARED_KEYS.map(async k => {
+  const settled = await Promise.allSettled(PUBLIC_KEYS.map(async k => {
     const url = `${SUPABASE_URL}/rest/v1/app_data?select=key,value&key=eq.${k}`;
     const res = await fetch(url, { headers: sbHeaders() });
     if(!res.ok) throw new Error(`${k}: ${res.status}`);
@@ -459,6 +469,17 @@ async function sbFetchAll(){
   if(!anyOk) throw new Error("Supabase fetch failed for every key");
   return map;
 }
+// Members, orders and invites — server-side, passcode required.
+async function fetchPrivate(){
+  const res = await fetch("/.netlify/functions/admin-read", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ passcode: ADMIN_PASSCODE }),
+  });
+  const out = await res.json();
+  if(!out.ok) throw new Error(out.error || "Couldn't load private data");
+  return out.data || {};
+}
+
 async function sbUpsert(key, value){
   const url = `${SUPABASE_URL}/rest/v1/app_data?on_conflict=key`;
   const res = await fetch(url, {
@@ -512,7 +533,17 @@ async function pushShared(onlyKeys){
       pr_cigar_brand_images: STATE.cigarBrandImages,
       pr_cigar_origins: STATE.cigarOrigins,
     };
-    const keys = (Array.isArray(onlyKeys) && onlyKeys.length) ? onlyKeys : Object.keys(all);
+    let keys = (Array.isArray(onlyKeys) && onlyKeys.length) ? onlyKeys : Object.keys(all);
+    // If members/orders never loaded this session, whatever's in memory is empty
+    // rather than current — saving it would wipe the real thing.
+    if(!PRIVATE_LOADED){
+      const blocked = keys.filter(k => PRIVATE_KEYS.includes(k));
+      if(blocked.length){
+        flash("Members and orders haven't loaded yet — press Refresh before saving those.", "err");
+        return;
+      }
+      keys = keys.filter(k => !PRIVATE_KEYS.includes(k));
+    }
     const updates = {};
     keys.forEach(k => { if(k in all) updates[k] = all[k]; });
 
@@ -541,18 +572,31 @@ async function pullShared(showFlash){
   try{
     const remote = await sbFetchAll();
     if(remote.pr_products) STATE.products = remote.pr_products;
-    if(remote.pr_members) STATE.members = remote.pr_members;
-    if(remote.pr_invites) STATE.invites = remote.pr_invites;
-    if(remote.pr_orders) STATE.orders = remote.pr_orders;
     if(remote.pr_home_links) STATE.homeLinks = remote.pr_home_links;
     if(remote.pr_hero_slides) STATE.heroSlides = remote.pr_hero_slides;
     if(remote.pr_cigar_brand_images) STATE.cigarBrandImages = remote.pr_cigar_brand_images;
     if(remote.pr_cigar_origins) STATE.cigarOrigins = remote.pr_cigar_origins;
-    dbSet("pr_products", STATE.products); dbSet("pr_members", STATE.members);
-    dbSet("pr_invites", STATE.invites); dbSet("pr_orders", STATE.orders);
+    // Only the shop data is cached on the device. Members and orders deliberately
+    // are not — they'd otherwise sit in local storage on whatever phone or laptop
+    // last opened the Back Office.
+    dbSet("pr_products", STATE.products);
     dbSet("pr_home_links", STATE.homeLinks);
     dbSet("pr_hero_slides", STATE.heroSlides);
     dbSet("pr_cigar_brand_images", STATE.cigarBrandImages); dbSet("pr_cigar_origins", STATE.cigarOrigins);
+
+    if(ADMIN_PASSCODE){
+      try{
+        const priv = await fetchPrivate();
+        if(priv.pr_members) STATE.members = priv.pr_members;
+        if(priv.pr_invites) STATE.invites = priv.pr_invites;
+        if(priv.pr_orders)  STATE.orders  = priv.pr_orders;
+        PRIVATE_LOADED = true;
+      }catch(e){
+        console.error("private fetch failed", e);
+        PRIVATE_LOADED = false;
+        flash("Couldn't load members and orders — try Refresh, or log in again.", "err");
+      }
+    }
     if(showFlash) flash("Refreshed.");
     return true;
   }catch(e){
@@ -717,9 +761,10 @@ let ADMIN_PASSCODE = null; // held in memory only for this session, never persis
 
 let STATE = {
   products: dbGet("pr_products", null) || SEED_PRODUCTS,
-  members: dbGet("pr_members", {}),
-  invites: dbGet("pr_invites", {}),
-  orders: dbGet("pr_orders", []),
+  // Never read from the device — these only ever arrive from admin-read.
+  members: {},
+  invites: {},
+  orders: [],
   adminPass: dbGet("pr_admin_pass", "humidor21"),
   homeLinks: dbGet("pr_home_links", null) || DEFAULT_HOME_LINKS,
   heroSlides: dbGet("pr_hero_slides", null) || DEFAULT_HERO_SLIDES,
@@ -1896,7 +1941,13 @@ async function handleAction(e){
     }).catch(()=>{ btn.disabled = false; flash("Couldn't reach the server. Try again.", "err"); });
   }
 
-  else if(act==="logout"){ ADMIN_PASSCODE = null; setState({session:null, cart:{}}); }
+  else if(act==="logout"){
+    ADMIN_PASSCODE = null;
+    PRIVATE_LOADED = false;
+    // Don't leave members or orders sitting in memory after signing out.
+    STATE.members = {}; STATE.invites = {}; STATE.orders = [];
+    setState({session:null, cart:{}});
+  }
 
   else if(act==="refresh"){ pullShared(true).then(()=>render()); }
 
