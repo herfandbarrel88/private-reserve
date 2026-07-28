@@ -534,15 +534,21 @@ async function pushShared(onlyKeys){
       pr_cigar_origins: STATE.cigarOrigins,
     };
     let keys = (Array.isArray(onlyKeys) && onlyKeys.length) ? onlyKeys : Object.keys(all);
-    // If members/orders never loaded this session, whatever's in memory is empty
-    // rather than current — saving it would wipe the real thing.
-    if(!PRIVATE_LOADED){
-      const blocked = keys.filter(k => PRIVATE_KEYS.includes(k));
-      if(blocked.length){
-        flash("Members and orders haven't loaded yet — press Refresh before saving those.", "err");
-        return;
-      }
-      keys = keys.filter(k => !PRIVATE_KEYS.includes(k));
+    // Guard against writing an empty list over real data — but judge it on the
+    // data actually in hand, not on a flag. Deliberately emptying a list is rare;
+    // a failed load leaving it empty is the case worth catching. If the block is
+    // genuinely empty AND the server has something there, refuse and say so.
+    const looksEmpty = k => {
+      const v = all[k];
+      if(v == null) return true;
+      if(Array.isArray(v)) return v.length === 0;
+      if(typeof v === "object") return Object.keys(v).length === 0;
+      return false;
+    };
+    const risky = keys.filter(k => PRIVATE_KEYS.includes(k) && looksEmpty(k) && !PRIVATE_LOADED);
+    if(risky.length){
+      flash("Members and orders haven't loaded yet — press Refresh, then try again.", "err");
+      return;
     }
     const updates = {};
     keys.forEach(k => { if(k in all) updates[k] = all[k]; });
@@ -587,9 +593,10 @@ async function pullShared(showFlash){
     if(ADMIN_PASSCODE){
       try{
         const priv = await fetchPrivate();
-        if(priv.pr_members) STATE.members = priv.pr_members;
-        if(priv.pr_invites) STATE.invites = priv.pr_invites;
-        if(priv.pr_orders)  STATE.orders  = priv.pr_orders;
+        // Assign whatever came back, including a legitimately empty list.
+        if("pr_members" in priv) STATE.members = priv.pr_members || {};
+        if("pr_invites" in priv) STATE.invites = priv.pr_invites || {};
+        if("pr_orders"  in priv) STATE.orders  = priv.pr_orders  || [];
         PRIVATE_LOADED = true;
       }catch(e){
         console.error("private fetch failed", e);
