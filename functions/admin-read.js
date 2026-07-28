@@ -33,15 +33,25 @@ exports.handler = async (event) => {
   try {
     const body = JSON.parse(event.body);
     const identifier = getIdentifier(event);
-    const limit = await checkRateLimit("pr_rate_adminread", identifier);
-    if (limit.blocked) return { statusCode: 200, body: JSON.stringify({ ok: false, error: limit.message }) };
+    // Same bucket admin-write uses. A brand-new bucket name isn't guaranteed to
+    // exist yet, and a limiter that can't find its own row shouldn't be able to
+    // lock the proprietor out of their own orders.
+    const RATE_KEY = "pr_rate_adminwrite";
+    try {
+      const limit = await checkRateLimit(RATE_KEY, identifier);
+      if (limit && limit.blocked) {
+        return { statusCode: 200, body: JSON.stringify({ ok: false, error: limit.message }) };
+      }
+    } catch (e) {
+      console.error("rate limit check failed, allowing request:", e.message);
+    }
 
     const storedPasscode = (await sbGet("pr_admin_pass")) || "humidor21";
     if (storedPasscode !== body.passcode) {
-      await recordFailure("pr_rate_adminread", identifier);
-      return { statusCode: 403, body: JSON.stringify({ ok: false, error: "Not authorized." }) };
+      try { await recordFailure(RATE_KEY, identifier); } catch (e) {}
+      return { statusCode: 403, body: JSON.stringify({ ok: false, error: "Passcode not accepted by admin-read." }) };
     }
-    await recordSuccess("pr_rate_adminread", identifier);
+    try { await recordSuccess(RATE_KEY, identifier); } catch (e) {}
 
     const data = {};
     await Promise.all(PRIVATE_KEYS.map(async (k) => { data[k] = await sbGet(k); }));
