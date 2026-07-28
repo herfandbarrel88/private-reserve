@@ -6,12 +6,21 @@
 const Stripe = require("stripe");
 
 const SUPABASE_URL = "https://njlrcamdlghcvzkwpbff.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qbHJjYW1kbGdoY3Z6a3dwYmZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1Nzg5MjIsImV4cCI6MjA5OTE1NDkyMn0.ul4nyNg2Lbwl3LKJ2qW6ogOw_xkgNYRwuAApOHO8CKI";
 
+// Reads use the service role key. This function reads the order list to avoid
+// recording the same payment twice, and that list is no longer readable with the
+// public key — it holds customer names, emails and delivery addresses.
 async function sbGet(key) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=value&key=eq.${key}`, {
-    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+    headers: {
+      apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+    },
   });
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(`Read failed for ${key} (${res.status}): ${detail.slice(0, 200)}`);
+  }
   const rows = await res.json();
   return rows[0] ? rows[0].value : null;
 }
