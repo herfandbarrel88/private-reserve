@@ -577,6 +577,18 @@ async function pushShared(onlyKeys){
 let CURRENT_ACTION = null; // set by handleAction so persist() knows what changed
 let PENDING_PUSH = null;   // in-flight save, so a refresh can't read stale data mid-write
 
+// The saved data may still hold the older four boxes. Top it up to eight empty,
+// hidden slots. This has to run after every fetch, not just at startup: logging
+// into the Back Office re-fetches, which would otherwise put the short list back
+// and the extra boxes would vanish from the form.
+function normalizeHomeLinks(){
+  if(!Array.isArray(STATE.homeLinks)) STATE.homeLinks = DEFAULT_HOME_LINKS.map(l=>({...l}));
+  if(STATE.homeLinks.length > HOME_BOX_COUNT) STATE.homeLinks = STATE.homeLinks.slice(0, HOME_BOX_COUNT);
+  while(STATE.homeLinks.length < HOME_BOX_COUNT){
+    STATE.homeLinks.push({ label: "", image: "", target: "", hidden: true });
+  }
+}
+
 async function pullShared(showFlash){
   // If a save is still in flight, let it finish first — otherwise we can fetch the
   // pre-save value and overwrite the user's change with it.
@@ -585,6 +597,7 @@ async function pullShared(showFlash){
     const remote = await sbFetchAll();
     if(remote.pr_products) STATE.products = remote.pr_products;
     if(remote.pr_home_links) STATE.homeLinks = remote.pr_home_links;
+    normalizeHomeLinks();
     if(remote.pr_hero_slides) STATE.heroSlides = remote.pr_hero_slides;
     if(remote.pr_cigar_brand_images) STATE.cigarBrandImages = remote.pr_cigar_brand_images;
     if(remote.pr_cigar_origins) STATE.cigarOrigins = remote.pr_cigar_origins;
@@ -2574,14 +2587,7 @@ async function boot(){
     // couldn't connect at this moment.
     flash("Couldn't reach the server — showing the last saved copy on this device.", "err");
   }
-  // Home page has eight link-box slots; trim or pad older saved data to match.
-  // Anything added by this padding starts hidden, so an existing four-box setup
-  // looks exactly the same after the upgrade.
-  if(!Array.isArray(STATE.homeLinks)) STATE.homeLinks = DEFAULT_HOME_LINKS.map(l=>({...l}));
-  if(STATE.homeLinks.length > HOME_BOX_COUNT) STATE.homeLinks = STATE.homeLinks.slice(0, HOME_BOX_COUNT);
-  while(STATE.homeLinks.length < HOME_BOX_COUNT){
-    STATE.homeLinks.push({ label: "", image: "", target: "", hidden: true });
-  }
+  normalizeHomeLinks();
   if(!Array.isArray(STATE.heroSlides) || STATE.heroSlides.length === 0){
     STATE.heroSlides = DEFAULT_HERO_SLIDES.map(s=>({...s}));
   }
