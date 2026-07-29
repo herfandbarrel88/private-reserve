@@ -750,11 +750,19 @@ function dbSet(key, val){
   }
 }
 
+// Eight link-box slots below the slider. The first four are the originals; the
+// rest start hidden so adding them changed nothing on the live home page until
+// they're filled in and switched on.
+const HOME_BOX_COUNT = 8;
 const DEFAULT_HOME_LINKS = [
   { image: "", label: "Cigars", category: "Cigars" },
   { image: "", label: "Spirits", category: "Spirits" },
   { image: "", label: "Accessories", category: "Accessories" },
   { image: "", label: "", target: "" },
+  { image: "", label: "", target: "", hidden: true },
+  { image: "", label: "", target: "", hidden: true },
+  { image: "", label: "", target: "", hidden: true },
+  { image: "", label: "", target: "", hidden: true },
 ];
 
 const DEFAULT_HERO_SLIDES = [
@@ -1308,7 +1316,11 @@ function renderStore(){
         ${results.map(p=>productCard(p)).join("") || `<div class="empty" style="grid-column:1/-1">No products match that search.</div>`}
       </div>`;
     } else if(STATE.category === "Home"){
-      const links = (STATE.homeLinks || DEFAULT_HOME_LINKS).slice(0,4);
+      // A box appears only if it's switched on and actually has a photo — an empty
+      // slot would otherwise render as a blank tile with a "+" in it.
+      const links = (STATE.homeLinks || DEFAULT_HOME_LINKS)
+        .slice(0, HOME_BOX_COUNT)
+        .filter(l => !l.hidden && l.image);
       const allSlides = (STATE.heroSlides && STATE.heroSlides.length ? STATE.heroSlides : DEFAULT_HERO_SLIDES);
       // Slides switched off in the Back Office simply aren't here.
       const slides = allSlides.filter(s=>!s.hidden);
@@ -1335,15 +1347,15 @@ function renderStore(){
 
       ${renderInfoStrip()}
 
-      <div class="home-links-grid">
+      ${!links.length ? "" : `<div class="home-links-grid">
         ${links.map((l)=>{
           const target = l.target || (l.category ? `category:${l.category}` : "");
           return `
           <button class="home-link-box" data-act="homelinkgo" data-target="${esc(target)}">
-            <div class="home-link-img">${l.image?`<img src="${esc(l.image)}" style="width:100%;height:100%;object-fit:cover"/>`:`<span class="p-img-fallback">+</span>`}</div>
+            <div class="home-link-img"><img src="${esc(l.image)}" style="width:100%;height:100%;object-fit:cover"/></div>
           </button>`;
         }).join("")}
-      </div>
+      </div>`}
 
       ${renderRecommended()}
       `;
@@ -1686,7 +1698,7 @@ function resolveHomeLinkTarget(target){
 }
 
 function renderHomePageAdmin(){
-  const links = (STATE.homeLinks || DEFAULT_HOME_LINKS).slice(0,4);
+  const links = (STATE.homeLinks || DEFAULT_HOME_LINKS).slice(0, HOME_BOX_COUNT);
   const slides = (STATE.heroSlides && STATE.heroSlides.length ? STATE.heroSlides : DEFAULT_HERO_SLIDES);
   return `<div class="panel">
     <h3 class="section-label">Home Page Slider</h3>
@@ -1711,12 +1723,18 @@ function renderHomePageAdmin(){
       </div>`).join("")}
 
     <h3 class="section-label" style="margin-top:22px">Home Page Link Boxes</h3>
-    <p class="cart-row-sub" style="margin-bottom:14px">The four boxes below the slider. Link each one to a category, a cigar origin, a specific brand, or one individual product.</p>
+    <p class="cart-row-sub" style="margin-bottom:14px">Up to eight boxes below the slider, two per row. Untick one to take it off the home page without losing its photo or link. A box with no photo never shows, whether it's ticked or not.</p>
     ${links.map((l,i)=>{
       const selectedTarget = l.target || (l.category ? `category:${l.category}` : "");
+      const liveNow = !l.hidden && l.image;
       return `
       <div style="border:1px solid var(--border);border-radius:4px;padding:12px;margin-bottom:12px">
         <div class="section-label" style="margin-top:0">Box ${i+1}</div>
+        <label class="slide-live" for="hl-live-${i}">
+          <input type="checkbox" id="hl-live-${i}" ${l.hidden?"":"checked"}/>
+          Show on the home page —
+          <span class="state ${liveNow?"on":"off"}">${liveNow?"LIVE":(l.hidden?"HIDDEN":"NO PHOTO YET")}</span>
+        </label>
         <div class="field"><label>Label</label><input id="hl-label-${i}" data-hl-field="label" data-hl-index="${i}" value="${esc(fieldVal(`hl-label-${i}`, l.label))}" placeholder="e.g. New Arrivals"/></div>
         ${imageField(`hl-img-${i}`, l.image, "Photo")}
         <div class="field"><label>Links to</label>
@@ -1864,14 +1882,18 @@ function readHomePageForm(){
                   btn:gv("btn").trim(), target:gv("target"), image: img, hidden });
   }
   const links = [];
-  for(let i=0; i<4; i++){
+  for(let i=0; i<HOME_BOX_COUNT; i++){
     const labelEl  = document.getElementById(`hl-label-${i}`);
     const imgEl    = document.getElementById(`hl-img-${i}`);
     if(!labelEl && !imgEl) continue;
+    const liveDraft = FORM_DRAFT[`hl-live-${i}`];
+    const liveEl = document.getElementById(`hl-live-${i}`);
+    const hidden = (liveDraft !== undefined) ? liveDraft === "0" : (liveEl ? !liveEl.checked : false);
     links.push({
       label:  fieldVal(`hl-label-${i}`, labelEl ? labelEl.value : "").trim(),
       image:  (PENDING_IMAGES[`hl-img-${i}`] !== undefined) ? PENDING_IMAGES[`hl-img-${i}`] : (imgEl ? imgEl.value.trim() : ""),
       target: fieldVal(`hl-target-${i}`, (()=>{ const el=document.getElementById(`hl-target-${i}`); return el?el.value:""; })()),
+      hidden,
     });
   }
   return { slides, links };
@@ -2552,10 +2574,14 @@ async function boot(){
     // couldn't connect at this moment.
     flash("Couldn't reach the server — showing the last saved copy on this device.", "err");
   }
-  // Home page now shows exactly 4 link boxes; trim or pad older saved data to match.
-  if(!Array.isArray(STATE.homeLinks)) STATE.homeLinks = [...DEFAULT_HOME_LINKS];
-  if(STATE.homeLinks.length > 4) STATE.homeLinks = STATE.homeLinks.slice(0,4);
-  while(STATE.homeLinks.length < 4) STATE.homeLinks.push({ label: "", image: "", target: "" });
+  // Home page has eight link-box slots; trim or pad older saved data to match.
+  // Anything added by this padding starts hidden, so an existing four-box setup
+  // looks exactly the same after the upgrade.
+  if(!Array.isArray(STATE.homeLinks)) STATE.homeLinks = DEFAULT_HOME_LINKS.map(l=>({...l}));
+  if(STATE.homeLinks.length > HOME_BOX_COUNT) STATE.homeLinks = STATE.homeLinks.slice(0, HOME_BOX_COUNT);
+  while(STATE.homeLinks.length < HOME_BOX_COUNT){
+    STATE.homeLinks.push({ label: "", image: "", target: "", hidden: true });
+  }
   if(!Array.isArray(STATE.heroSlides) || STATE.heroSlides.length === 0){
     STATE.heroSlides = DEFAULT_HERO_SLIDES.map(s=>({...s}));
   }
