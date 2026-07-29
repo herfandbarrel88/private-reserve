@@ -1940,6 +1940,14 @@ async function handleAction(e){
   const act = el.dataset.act;
   const val = el.dataset.val;
 
+  // The photo viewer's arrows and dots sit inside the overlay, and the overlay
+  // itself closes on tap. Without this the tap navigates and then immediately
+  // closes the viewer, so the arrows look like they do nothing.
+  if(act === "viewernav" || act === "viewerdot"){
+    e.stopPropagation();
+    if(e.preventDefault) e.preventDefault();
+  }
+
   // Before any save that touches shared data, pull the freshest copy from the
   // server first. Without this, a browser tab left open a while could push a
   // stale, incomplete product list and silently overwrite newer changes made
