@@ -360,6 +360,12 @@
   .small-note{font-size:10.5px;color:var(--muted2);margin:4px 0 14px;}
   .empty{color:var(--muted2);font-size:13px;padding:24px 0;text-align:center;}
 
+  .slide-live{display:flex;align-items:center;gap:8px;margin:0 0 12px;
+    font-size:12px;color:var(--muted);cursor:pointer;user-select:none;}
+  .slide-live input{width:auto;margin:0;flex-shrink:0;}
+  .slide-live .state{font-weight:700;letter-spacing:.3px;}
+  .slide-live .state.on{color:var(--good);}
+  .slide-live .state.off{color:var(--muted2);}
   .admin-tabs{display:flex;gap:6px;overflow-x:auto;padding:12px 16px 0;}
   .admin-tab{white-space:nowrap;background:transparent;border:1px solid var(--border2);color:var(--muted);
     border-radius:4px;padding:7px 14px;font-size:12px;}
@@ -909,7 +915,13 @@ function restoreDrafts(){
   if(!ADMIN_PASSCODE) return;               // only relevant while editing in the admin
   Object.keys(FORM_DRAFT).forEach(id=>{
     const el = document.getElementById(id);
-    if(el && el.value !== FORM_DRAFT[id]) el.value = FORM_DRAFT[id];
+    if(!el) return;
+    if(el.type === "checkbox"){
+      const want = FORM_DRAFT[id] === "1";
+      if(el.checked !== want) el.checked = want;
+    } else if(el.value !== FORM_DRAFT[id]){
+      el.value = FORM_DRAFT[id];
+    }
   });
 }
 
@@ -1297,14 +1309,16 @@ function renderStore(){
       </div>`;
     } else if(STATE.category === "Home"){
       const links = (STATE.homeLinks || DEFAULT_HOME_LINKS).slice(0,4);
-      const slides = (STATE.heroSlides && STATE.heroSlides.length ? STATE.heroSlides : DEFAULT_HERO_SLIDES);
-      const hi = Math.min(STATE.heroIndex || 0, slides.length-1);
-      const slide = slides[hi] || slides[0];
+      const allSlides = (STATE.heroSlides && STATE.heroSlides.length ? STATE.heroSlides : DEFAULT_HERO_SLIDES);
+      // Slides switched off in the Back Office simply aren't here.
+      const slides = allSlides.filter(s=>!s.hidden);
+      const hi = slides.length ? Math.min(STATE.heroIndex || 0, slides.length-1) : 0;
+      const slide = slides[hi] || null;
       body = `
       ${searchBar()}
       ${catNav()}
 
-      <div class="hero${(slide.image && !slide.eyebrow && !slide.heading && !slide.sub && !slide.btn)?' hero-imageonly':''}">
+      ${!slide ? "" : `<div class="hero${(slide.image && !slide.eyebrow && !slide.heading && !slide.sub && !slide.btn)?' hero-imageonly':''}">
         ${slide.image?`<div class="hero-bg"><img src="${esc(slide.image)}" alt=""/></div>`:""}
         <div class="hero-inner">
           <div class="hero-inner-text">
@@ -1317,7 +1331,7 @@ function renderStore(){
         ${slides.length>1?`<div class="hero-dots">
           ${slides.map((_,i)=>`<button class="hero-dot ${i===hi?'active':''}" data-act="heroslide" data-val="${i}" aria-label="Slide ${i+1}"></button>`).join("")}
         </div>`:""}
-      </div>
+      </div>`}
 
       ${renderInfoStrip()}
 
@@ -1455,7 +1469,9 @@ function draftOn(e){
   // Capture any admin form field with an id, so a re-render can't wipe an
   // in-progress edit. Every admin input id is unique, so this is safe.
   if(el && el.id && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT")){
-    FORM_DRAFT[el.id] = el.value;
+    // Checkboxes carry their state in .checked, not .value — storing .value here
+    // would record "on" whether it's ticked or not.
+    FORM_DRAFT[el.id] = (el.type === "checkbox") ? (el.checked ? "1" : "0") : el.value;
   }
 }
 document.addEventListener("input", draftOn, true);
@@ -1674,10 +1690,16 @@ function renderHomePageAdmin(){
   const slides = (STATE.heroSlides && STATE.heroSlides.length ? STATE.heroSlides : DEFAULT_HERO_SLIDES);
   return `<div class="panel">
     <h3 class="section-label">Home Page Slider</h3>
-    <p class="cart-row-sub" style="margin-bottom:14px">The large box at the top of the Home tab. It rotates through these slides automatically.</p>
+    <p class="cart-row-sub" style="margin-bottom:14px">The large box at the top of the Home tab. Untick a slide to take it off the home page without deleting it — the slider rotates through whichever are left. With one slide live it simply sits still.</p>
+    ${slides.length && slides.every(s=>s.hidden) ? `<div class="msg err" style="margin-bottom:14px">Every slide is hidden, so the slider won't appear on the home page at all.</div>` : ""}
     ${slides.map((sl,i)=>`
       <div style="border:1px solid var(--border);border-radius:4px;padding:12px;margin-bottom:12px">
         <div class="section-label" style="margin-top:0">Slide ${i+1}</div>
+        <label class="slide-live" for="hs-live-${i}">
+          <input type="checkbox" id="hs-live-${i}" ${sl.hidden?"":"checked"}/>
+          Show on the home page —
+          <span class="state ${sl.hidden?"off":"on"}">${sl.hidden?"HIDDEN":"LIVE"}</span>
+        </label>
         <div class="field"><label>Small label above the heading</label><input id="hs-eyebrow-${i}" data-hs-field="eyebrow" data-hs-index="${i}" value="${esc(fieldVal(`hs-eyebrow-${i}`, sl.eyebrow||""))}" placeholder="e.g. PREMIUM CIGARS"/></div>
         <div class="field"><label>Heading</label><input id="hs-heading-${i}" data-hs-field="heading" data-hs-index="${i}" value="${esc(fieldVal(`hs-heading-${i}`, sl.heading||""))}" placeholder="e.g. Elevate Your Experience."/></div>
         <div class="field"><label>Text under the heading</label><input id="hs-sub-${i}" data-hs-field="sub" data-hs-index="${i}" value="${esc(fieldVal(`hs-sub-${i}`, sl.sub||""))}" placeholder="e.g. Hand selected. Expertly curated."/></div>
@@ -1835,8 +1857,11 @@ function readHomePageForm(){
     const gv = f => fieldVal(`hs-${f}-${i}`, (()=>{ const el=document.getElementById(`hs-${f}-${i}`); return el?el.value:""; })());
     const imgEl = document.getElementById(`hs-img-${i}`);
     const img = (PENDING_IMAGES[`hs-img-${i}`] !== undefined) ? PENDING_IMAGES[`hs-img-${i}`] : (imgEl ? imgEl.value.trim() : "");
+    const liveDraft = FORM_DRAFT[`hs-live-${i}`];
+    const liveEl = document.getElementById(`hs-live-${i}`);
+    const hidden = (liveDraft !== undefined) ? liveDraft === "0" : (liveEl ? !liveEl.checked : false);
     slides.push({ eyebrow:gv("eyebrow").trim(), heading:gv("heading").trim(), sub:gv("sub").trim(),
-                  btn:gv("btn").trim(), target:gv("target"), image: img });
+                  btn:gv("btn").trim(), target:gv("target"), image: img, hidden });
   }
   const links = [];
   for(let i=0; i<4; i++){
@@ -2578,8 +2603,9 @@ setInterval(()=>{
   if(STATE.category !== "Home") return;
   if(STATE.storeScreen !== "shop") return;
   if(STATE.searchQuery) return;
-  const n = (STATE.heroSlides && STATE.heroSlides.length) ? STATE.heroSlides.length : 0;
-  if(n < 2) return;
+  const live = (STATE.heroSlides || []).filter(s=>!s.hidden);
+  const n = live.length;
+  if(n < 2) return;   // one slide sits still; none means there's no slider at all
   if(document.hidden) return;
   STATE.heroIndex = ((STATE.heroIndex || 0) + 1) % n;
   render();
