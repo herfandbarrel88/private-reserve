@@ -3,17 +3,22 @@
 // the caller's IP) in Supabase and blocks further tries once too many failures
 // happen in a short window. This stops an automated script from rapidly guessing
 // passcodes or passwords — a human mistyping a few times is never affected.
-
+//
+// The counters are read and written with the service role key. They used to use
+// the public key, which meant the database had to allow anyone to write to these
+// rows — and anyone can read that key out of the app's own source. An attacker
+// could simply overwrite their own lockout and keep guessing, which defeats the
+// point of having a limiter at all.
 const SUPABASE_URL = "https://njlrcamdlghcvzkwpbff.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qbHJjYW1kbGdoY3Z6a3dwYmZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1Nzg5MjIsImV4cCI6MjA5OTE1NDkyMn0.ul4nyNg2Lbwl3LKJ2qW6ogOw_xkgNYRwuAApOHO8CKI";
-
 const MAX_ATTEMPTS = 8;       // failures allowed
 const WINDOW_MS = 15 * 60 * 1000;   // within this window
 const LOCKOUT_MS = 15 * 60 * 1000;  // then locked out for this long
-
 async function sbGet(key) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?select=value&key=eq.${key}`, {
-    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+    headers: {
+      apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+    },
   });
   const rows = await res.json();
   return rows[0] ? rows[0].value : null;
@@ -22,20 +27,18 @@ async function sbSet(key, value) {
   await fetch(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=key`, {
     method: "POST",
     headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
       "Content-Type": "application/json",
       Prefer: "resolution=merge-duplicates,return=minimal",
     },
     body: JSON.stringify([{ key, value }]),
   });
 }
-
 function getIdentifier(event, extra) {
   const ip = (event.headers["x-nf-client-connection-ip"] || event.headers["x-forwarded-for"] || "unknown").split(",")[0].trim();
   return extra ? `${ip}:${extra}` : ip;
 }
-
 // Call before checking a password/passcode. Returns { blocked: bool, message }.
 async function checkRateLimit(bucketKey, identifier) {
   const all = (await sbGet(bucketKey)) || {};
@@ -47,7 +50,6 @@ async function checkRateLimit(bucketKey, identifier) {
   }
   return { blocked: false };
 }
-
 // Call after a failed attempt.
 async function recordFailure(bucketKey, identifier) {
   const all = (await sbGet(bucketKey)) || {};
@@ -63,7 +65,6 @@ async function recordFailure(bucketKey, identifier) {
   all[identifier] = entry;
   await sbSet(bucketKey, all);
 }
-
 // Call after a successful attempt, to clear the counter.
 async function recordSuccess(bucketKey, identifier) {
   const all = (await sbGet(bucketKey)) || {};
@@ -72,5 +73,4 @@ async function recordSuccess(bucketKey, identifier) {
     await sbSet(bucketKey, all);
   }
 }
-
 module.exports = { getIdentifier, checkRateLimit, recordFailure, recordSuccess };
