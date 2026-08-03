@@ -42,7 +42,10 @@ exports.handler = async (event) => {
       line_items.push({
         quantity: item.qty,
         price_data: {
-          currency: "usd",
+          // Prices in the catalog are AUD, delivery is Australia-only and the
+          // order emails say AUD. Charging in USD meant Stripe was converting,
+          // so a $300 cart was billed as US$300 — around A$460.
+          currency: "aud",
           unit_amount: Math.round(unitPrice * 100),
           product_data: { name: `${product.name} (${variantLabel})`, description: product.category },
         },
@@ -63,7 +66,7 @@ exports.handler = async (event) => {
         {
           shipping_rate_data: {
             type: "fixed_amount",
-            fixed_amount: { amount: Math.round(deliveryFee * 100), currency: "usd" },
+            fixed_amount: { amount: Math.round(deliveryFee * 100), currency: "aud" },
             display_name: deliveryFee === 0 ? "Free delivery" : "Delivery",
           },
         },
