@@ -47,7 +47,14 @@ exports.handler = async (event) => {
           // so a $300 cart was billed as US$300 — around A$460.
           currency: "aud",
           unit_amount: Math.round(unitPrice * 100),
-          product_data: { name: `${product.name} (${variantLabel})`, description: product.category },
+          product_data: {
+            name: `${product.name} (${variantLabel})`,
+            description: product.category,
+            // The cart used to be packed whole into session metadata, which
+            // Stripe caps at 500 characters — big orders were rejected outright.
+            // Each line carries its own id instead, so there's no such ceiling.
+            metadata: { pid: item.id, variant: isBox ? "box" : "single" },
+          },
         },
       });
     }
@@ -57,6 +64,16 @@ exports.handler = async (event) => {
     const DELIVERY_THRESHOLD = 300;
     const DELIVERY_FEE = 10;
     const deliveryFee = subtotal >= DELIVERY_THRESHOLD ? 0 : DELIVERY_FEE;
+
+    // Kept only as a fallback for a session created before this change, and
+    // dropped silently when the cart is too big for the 500-character limit.
+    const cartJson = JSON.stringify(items);
+    const metadata = {
+      memberEmail: memberEmail || "",
+      memberName: memberName || "",
+      deliveryFee: String(deliveryFee),
+    };
+    if (cartJson.length <= 420) metadata.cart = cartJson;
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
@@ -74,12 +91,7 @@ exports.handler = async (event) => {
       customer_email: memberEmail,
       success_url: `${siteUrl}/?order_success=1&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/?order_cancelled=1`,
-      metadata: {
-        memberEmail: memberEmail || "",
-        memberName: memberName || "",
-        cart: JSON.stringify(items),
-        deliveryFee: String(deliveryFee),
-      },
+      metadata: metadata,
     });
     return { statusCode: 200, body: JSON.stringify({ url: session.url }) };
   } catch (err) {

@@ -99,7 +99,7 @@ exports.handler = async (event) => {
 
     const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
-      expand: ["payment_intent.payment_method"],
+      expand: ["payment_intent.payment_method", "line_items.data.price.product"],
     });
 
     if (session.payment_status !== "paid") {
@@ -113,7 +113,21 @@ exports.handler = async (event) => {
       return { statusCode: 200, body: JSON.stringify({ paid: true, order: already }) };
     }
 
-    const cartItems = JSON.parse(session.metadata.cart || "[]");
+    // The cart is read back from the line items, where each one carries its own
+    // product id. The old approach packed the whole cart into session metadata,
+    // which Stripe caps at 500 characters — big carts simply failed. The metadata
+    // fallback stays for any session created before that change.
+    const lineItems = (session.line_items && session.line_items.data) || [];
+    const fromLines = lineItems
+      .filter(l => l.price && l.price.product && l.price.product.metadata && l.price.product.metadata.pid)
+      .map(l => ({
+        id: l.price.product.metadata.pid,
+        variant: l.price.product.metadata.variant || "single",
+        qty: l.quantity,
+      }));
+    const cartItems = fromLines.length
+      ? fromLines
+      : JSON.parse(session.metadata.cart || "[]");
     const products = (await sbGet("pr_products")) || [];
 
     const orderItems = cartItems.map((c) => {
