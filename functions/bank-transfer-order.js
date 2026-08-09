@@ -4,6 +4,7 @@
 // record the order as "Awaiting payment", decrement stock, and email the owner.
 
 const SUPABASE_URL = "https://njlrcamdlghcvzkwpbff.supabase.co";
+const { getIdentifier, checkRateLimit, recordFailure } = require("./rate-limit");
 
 // Reads use the service role key. This function reads the existing order list and
 // writes it back with the new order prepended — if the read were ever blocked or
@@ -50,8 +51,10 @@ async function sendEnquiryEmail(order) {
       },
       body: JSON.stringify({
         from: "The Private Reserve <onboarding@resend.dev>",
-        to: [OWNER_EMAIL],
-        subject: `BANK TRANSFER — ${order.orderNo} — $${order.total.toFixed(2)} — ${order.memberName}`,
+        // The customer gets their own copy; the shop is copied in.
+        to: order.memberEmail ? [order.memberEmail] : [OWNER_EMAIL],
+        bcc: order.memberEmail ? [OWNER_EMAIL] : undefined,
+        subject: `Your order ${order.orderNo} — The Private Reserve`,
         html: `
           <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;color:#222">
             <h1 style="margin:0 0 4px;font-size:22px;letter-spacing:1px">THE PRIVATE RESERVE</h1>
@@ -102,6 +105,20 @@ exports.handler = async (event) => {
   }
 
   try {
+    // A bank-transfer order takes no payment but reduces stock straight away, so
+    // nothing stops a script firing hundreds of them and emptying the catalogue.
+    // Throttle per IP. Ordinary use is one order; the ceiling is well clear of it.
+    const identifier = getIdentifier(event);
+    const RATE_KEY = "pr_rate_btorder";
+    try {
+      const limit = await checkRateLimit(RATE_KEY, identifier);
+      if (limit && limit.blocked) {
+        return { statusCode: 429, body: JSON.stringify({ error: "Too many orders from this connection. Please try again shortly, or contact us directly." }) };
+      }
+    } catch (e) {
+      console.error("rate limit check failed, allowing request:", e.message);
+    }
+
     const { items, memberEmail, memberName, phone, shipping } = JSON.parse(event.body);
 
     if (!items || !items.length) {
@@ -186,6 +203,10 @@ exports.handler = async (event) => {
       sbSet("pr_orders", [order, ...existingOrders]),
       sbSet("pr_products", updatedProducts),
     ]);
+
+    // Counts this order against the throttle. The helper is named for failed
+    // logins, but all it does is increment the counter for this identifier.
+    try { await recordFailure(RATE_KEY, identifier); } catch (e) {}
 
     await sendEnquiryEmail(order);
 

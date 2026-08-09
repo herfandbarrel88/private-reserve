@@ -50,8 +50,10 @@ async function sendOrderEmail(order) {
       },
       body: JSON.stringify({
         from: "The Private Reserve <onboarding@resend.dev>",
-        to: [OWNER_EMAIL],
-        subject: `Order ${order.orderNo} — $${order.total.toFixed(2)} — ${order.memberName}`,
+        // The customer gets their own copy; the shop is copied in.
+        to: order.memberEmail ? [order.memberEmail] : [OWNER_EMAIL],
+        bcc: order.memberEmail ? [OWNER_EMAIL] : undefined,
+        subject: `Your order ${order.orderNo} — The Private Reserve`,
         html: `
           <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;color:#222">
             <h1 style="margin:0 0 4px;font-size:22px;letter-spacing:1px">THE PRIVATE RESERVE</h1>
