@@ -1017,7 +1017,7 @@ function renderPhotoViewer(){
   if(!STATE.photoViewer) return "";
   const p = STATE.products.find(pp=>pp.id===STATE.photoViewer.productId);
   if(!p) return "";
-  const photos = [p.image, p.image2].filter(Boolean);
+  const photos = [p.image, p.image2, p.image3].filter(Boolean);
   if(!photos.length) return "";
   const i = Math.min(STATE.photoViewer.index, photos.length-1);
   const multi = photos.length > 1;
@@ -1066,7 +1066,7 @@ function productCard(p){
   const hasBox = p.boxPrice && p.boxPrice > 0;
   const totalInCart = (STATE.cart[`${p.id}__single`]||0) + (STATE.cart[`${p.id}__box`]||0);
   const soldOut = p.stock === 0;
-  const photos = [p.image, p.image2].filter(Boolean);
+  const photos = [p.image, p.image2, p.image3].filter(Boolean);
   const hasPhoto = photos.length > 0;
 
   // Which variant is selected for a box-price product (defaults to single).
@@ -1525,6 +1525,7 @@ function clearProductDraft(){
   Object.keys(FORM_DRAFT).forEach(k=>{ if(k.startsWith("pf-")) delete FORM_DRAFT[k]; });
   delete PENDING_IMAGES["pf-img"];
   delete PENDING_IMAGES["pf-img2"];
+  delete PENDING_IMAGES["pf-img3"];
 }
 
 // Clear a specific field's draft once it's been saved.
@@ -1560,6 +1561,7 @@ function renderProductsAdmin(){
     </div>
     ${imageField("pf-img", f?f.image:"", "Photo")}
     ${imageField("pf-img2", f?f.image2:"", "Second photo (optional)")}
+    ${imageField("pf-img3", f?f.image3:"", "Third photo (optional)")}
     <div class="field"><label>Description</label><textarea id="pf-desc" style="min-height:60px">${esc(dv("pf-desc", f?f.description:''))}</textarea></div>
     <h3 class="section-label" style="margin-top:18px">Cigar Details (only used when Category is Cigars)</h3>
     <div class="row3">
@@ -1864,6 +1866,7 @@ function collectEmbeddedPhotos(){
   (STATE.products||[]).forEach((p,idx)=>{
     if(isData(p.image))  jobs.push({kind:"product", idx, field:"image"});
     if(isData(p.image2)) jobs.push({kind:"product", idx, field:"image2"});
+    if(isData(p.image3)) jobs.push({kind:"product", idx, field:"image3"});
   });
   Object.entries(STATE.cigarBrandImages||{}).forEach(([key,v])=>{
     if(isData(v)) jobs.push({kind:"brand", key});
@@ -1949,6 +1952,7 @@ function readProductForm(){
     boxLabel: g("pf-boxlabel").trim(),
     image: (PENDING_IMAGES["pf-img"] !== undefined) ? PENDING_IMAGES["pf-img"] : g("pf-img").trim(),
     image2: (PENDING_IMAGES["pf-img2"] !== undefined) ? PENDING_IMAGES["pf-img2"] : (g("pf-img2")||"").trim(),
+    image3: (PENDING_IMAGES["pf-img3"] !== undefined) ? PENDING_IMAGES["pf-img3"] : (g("pf-img3")||"").trim(),
     description: g("pf-desc").trim(),
     cigarOrigin: g("pf-origin").trim(),
     cigarBrand: g("pf-brand"),
@@ -2125,7 +2129,7 @@ async function handleAction(e){
   else if(act==="viewphotos"){
     const p = STATE.products.find(pp=>pp.id===val);
     if(!p) return;
-    const photos = [p.image, p.image2].filter(Boolean);
+    const photos = [p.image, p.image2, p.image3].filter(Boolean);
     if(!photos.length) return;
     STATE.photoViewer = { productId: val, index: 0 };
     render();
@@ -2133,7 +2137,7 @@ async function handleAction(e){
   else if(act==="viewernav"){
     if(!STATE.photoViewer) return;
     const p = STATE.products.find(pp=>pp.id===STATE.photoViewer.productId);
-    const photos = p ? [p.image, p.image2].filter(Boolean) : [];
+    const photos = p ? [p.image, p.image2, p.image3].filter(Boolean) : [];
     const n = photos.length;
     if(n<2){ return; }
     const d = parseInt(el.dataset.delta,10);
@@ -2269,16 +2273,16 @@ async function handleAction(e){
   else if(act==="saveproduct"){
     const f = formSnapshot || readProductForm();
     if(!f){ flash("Couldn't read the form — try again.", "err"); return; }
-    const { name, category, price, stock, boxPriceRaw, boxLabel, image, image2,
+    const { name, category, price, stock, boxPriceRaw, boxLabel, image, image2, image3,
             description, cigarOrigin, cigarBrand, cigarLine } = f;
     const boxPrice = boxPriceRaw ? parseFloat(boxPriceRaw) : null;
     if(!name || isNaN(price)) return flash("Name and price are required.","err");
     if(boxPriceRaw && isNaN(boxPrice)) return flash("Box price must be a number.","err");
     if(val){
-      STATE.products = STATE.products.map(p=>p.id===val?{...p,name,category,price,stock,boxPrice,boxLabel,image,image2,description,cigarOrigin,cigarBrand,cigarLine}:p);
+      STATE.products = STATE.products.map(p=>p.id===val?{...p,name,category,price,stock,boxPrice,boxLabel,image,image2,image3,description,cigarOrigin,cigarBrand,cigarLine}:p);
       flash("Product updated.");
     } else {
-      STATE.products = [{id:genId("prod"),name,category,price,stock,boxPrice,boxLabel,image,image2,description,cigarOrigin,cigarBrand,cigarLine}, ...STATE.products];
+      STATE.products = [{id:genId("prod"),name,category,price,stock,boxPrice,boxLabel,image,image2,image3,description,cigarOrigin,cigarBrand,cigarLine}, ...STATE.products];
       flash("Product added.");
     }
     clearProductDraft();
