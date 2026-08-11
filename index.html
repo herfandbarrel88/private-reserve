@@ -325,6 +325,9 @@
   .pv-segbtn span{font-weight:700;font-size:10px;}
   .pv-segbtn.on{background:var(--gold);color:#1a140c;}
   .pv-segbtn.on span{color:#1a140c;}
+  .pv-onlybox{border:1px solid var(--border2);border-radius:4px;background:var(--surface2);
+    color:var(--muted);font-family:'Montserrat',sans-serif;font-size:10px;font-weight:700;
+    letter-spacing:.5px;text-transform:uppercase;text-align:center;padding:6px 4px;margin-bottom:7px;}
   .pv-priceline{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px;}
   .pv-priceline .p-price{font-size:15px;}
   .pv-qty{display:flex;align-items:center;border:1px solid var(--border2);border-radius:4px;overflow:hidden;}
@@ -1064,13 +1067,16 @@ function grandTotal(){ return cartTotal() + deliveryFee(); }
 
 function productCard(p){
   const hasBox = p.boxPrice && p.boxPrice > 0;
+  // "Hide single price" only means anything when there's a box price to sell
+  // instead — otherwise it would leave the product with no price at all.
+  const singleHidden = !!p.hideSingle && hasBox;
   const totalInCart = (STATE.cart[`${p.id}__single`]||0) + (STATE.cart[`${p.id}__box`]||0);
   const soldOut = p.stock === 0;
   const photos = [p.image, p.image2, p.image3].filter(Boolean);
   const hasPhoto = photos.length > 0;
 
   // Which variant is selected for a box-price product (defaults to single).
-  const sel = STATE.cardVariant[p.id] || "single";
+  const sel = singleHidden ? "box" : (STATE.cardVariant[p.id] || "single");
   const activePrice = (hasBox && sel === "box") ? p.boxPrice : p.price;
   // How many they can still add, allowing for what's already in their cart.
   const available = Math.max(0, p.stock - totalInCart);
@@ -1082,7 +1088,10 @@ function productCard(p){
        <span class="p-img-zoom">⤢</span>`
     : (p.category==="Cigars"?"🚬":p.category==="Spirits"?"🥃":"📦");
 
-  const toggle = hasBox
+  const toggle = singleHidden
+    // Sold only as a box: no choice to make, so show the label on its own.
+    ? `<div class="pv-onlybox">${esc(p.boxLabel||"Box")}</div>`
+    : hasBox
     ? `<div class="pv-seg">
         <button class="pv-segbtn ${sel==='single'?'on':''}" data-act="cardvariant" data-val="${p.id}" data-variant="single">Single<br><span>${money(p.price)}</span></button>
         <button class="pv-segbtn ${sel==='box'?'on':''}" data-act="cardvariant" data-val="${p.id}" data-variant="box">${esc(p.boxLabel||"Box")}<br><span>${money(p.boxPrice)}</span></button>
@@ -1526,6 +1535,7 @@ function clearProductDraft(){
   delete PENDING_IMAGES["pf-img"];
   delete PENDING_IMAGES["pf-img2"];
   delete PENDING_IMAGES["pf-img3"];
+  delete FORM_DRAFT["pf-hidesingle"];
 }
 
 // Clear a specific field's draft once it's been saved.
@@ -1559,6 +1569,11 @@ function renderProductsAdmin(){
       <div class="field"><label>Box Price ($, optional)</label><input id="pf-boxprice" type="number" value="${esc(dv("pf-boxprice", f&&f.boxPrice?f.boxPrice:''))}" placeholder="Leave blank if no box option"/></div>
       <div class="field"><label>Box Label (optional)</label><input id="pf-boxlabel" value="${esc(dv("pf-boxlabel", f?f.boxLabel||'':''))}" placeholder="e.g. Box of 25"/></div>
     </div>
+    <label class="slide-live" for="pf-hidesingle">
+      <input type="checkbox" id="pf-hidesingle" ${f&&f.hideSingle?"checked":""}/>
+      Hide the single price — sell this as a box only
+    </label>
+    <p class="small-note" style="margin:-8px 0 12px">Only applies when a box price is set. Customers then see just the box price, with no single option.</p>
     ${imageField("pf-img", f?f.image:"", "Photo")}
     ${imageField("pf-img2", f?f.image2:"", "Second photo (optional)")}
     ${imageField("pf-img3", f?f.image3:"", "Third photo (optional)")}
@@ -1950,6 +1965,9 @@ function readProductForm(){
     stock: parseInt(g("pf-stock"),10)||0,
     boxPriceRaw: g("pf-boxprice").trim(),
     boxLabel: g("pf-boxlabel").trim(),
+    hideSingle: (()=>{ const dft=FORM_DRAFT["pf-hidesingle"];
+      if(dft!==undefined) return dft==="1";
+      const el=document.getElementById("pf-hidesingle"); return el?el.checked:false; })(),
     image: (PENDING_IMAGES["pf-img"] !== undefined) ? PENDING_IMAGES["pf-img"] : g("pf-img").trim(),
     image2: (PENDING_IMAGES["pf-img2"] !== undefined) ? PENDING_IMAGES["pf-img2"] : (g("pf-img2")||"").trim(),
     image3: (PENDING_IMAGES["pf-img3"] !== undefined) ? PENDING_IMAGES["pf-img3"] : (g("pf-img3")||"").trim(),
@@ -2273,16 +2291,16 @@ async function handleAction(e){
   else if(act==="saveproduct"){
     const f = formSnapshot || readProductForm();
     if(!f){ flash("Couldn't read the form — try again.", "err"); return; }
-    const { name, category, price, stock, boxPriceRaw, boxLabel, image, image2, image3,
+    const { name, category, price, stock, boxPriceRaw, boxLabel, hideSingle, image, image2, image3,
             description, cigarOrigin, cigarBrand, cigarLine } = f;
     const boxPrice = boxPriceRaw ? parseFloat(boxPriceRaw) : null;
     if(!name || isNaN(price)) return flash("Name and price are required.","err");
     if(boxPriceRaw && isNaN(boxPrice)) return flash("Box price must be a number.","err");
     if(val){
-      STATE.products = STATE.products.map(p=>p.id===val?{...p,name,category,price,stock,boxPrice,boxLabel,image,image2,image3,description,cigarOrigin,cigarBrand,cigarLine}:p);
+      STATE.products = STATE.products.map(p=>p.id===val?{...p,name,category,price,stock,boxPrice,boxLabel,hideSingle,image,image2,image3,description,cigarOrigin,cigarBrand,cigarLine}:p);
       flash("Product updated.");
     } else {
-      STATE.products = [{id:genId("prod"),name,category,price,stock,boxPrice,boxLabel,image,image2,image3,description,cigarOrigin,cigarBrand,cigarLine}, ...STATE.products];
+      STATE.products = [{id:genId("prod"),name,category,price,stock,boxPrice,boxLabel,hideSingle,image,image2,image3,description,cigarOrigin,cigarBrand,cigarLine}, ...STATE.products];
       flash("Product added.");
     }
     clearProductDraft();
