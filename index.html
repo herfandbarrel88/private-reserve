@@ -1312,14 +1312,21 @@ function renderRecommended(){
       <button class="rec-viewall" data-act="setcat" data-val="Cigars">View all ›</button>
     </div>
     <div class="rec-row">
-      ${pick.map(p=>`
+      ${pick.map(p=>{
+        // Mirror the product card: a box-only item has no meaningful single
+        // price, and printing p.price straight out showed those as $0.00.
+        const hasBox = p.boxPrice && p.boxPrice > 0;
+        const boxOnly = !!p.hideSingle && hasBox;
+        const shown = boxOnly ? p.boxPrice : p.price;
+        return `
         <button class="rec-card" data-act="gotocigar" data-val="${p.id}">
           <div class="rec-img">${p.image?`<img src="${esc(p.image)}"/>`:`<span>🚬</span>`}</div>
           <div class="rec-body">
             <div class="rec-name">${esc(p.name)}</div>
-            <div class="rec-price">${money(p.price)}</div>
+            <div class="rec-price">${money(shown)}${boxOnly?` <span style="font-size:11px;color:var(--muted)">${esc(p.boxLabel||"Box")}</span>`:""}</div>
           </div>
-        </button>`).join("")}
+        </button>`;
+      }).join("")}
     </div>`;
 }
 
@@ -2116,12 +2123,12 @@ async function handleAction(e){
   else if(act==="navback"){ history.back(); }
 
   else if(act==="gotocigar"){
-    const p = STATE.products.find(pp=>pp.id===val);
-    if(!p) return;
-    STATE.category = "Cigars";
-    STATE.storeScreen = "shop";
-    STATE.searchQuery = "";
-    STATE.scrollToProduct = val; // renderStore scrolls to it after render
+    // Was setting the category to Cigars but leaving cigarNav at "root", so the
+    // customer landed on the list of origins with the product nowhere on the
+    // page — and the scroll had nothing to find. resolveHomeLinkTarget already
+    // works out the origin/brand/line for a product, so reuse it.
+    resolveHomeLinkTarget("product:" + val);
+    pushNavState();
     render();
   }
   else if(act==="cardvariant"){
