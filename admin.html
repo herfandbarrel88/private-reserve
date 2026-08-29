@@ -431,6 +431,10 @@
 
 const CATEGORIES = ["Cigars","Spirits","Accessories"];
 const SHOW_PROPRIETOR_TAB = true; // owner's private admin.html copy
+// Bank transfer is hidden from customers. The screen, the submit handler and
+// functions/bank-transfer-order.js are all still in place — set this to true
+// to bring the option back, no other change needed.
+const SHOW_BANK_TRANSFER = false;
 const DEFAULT_CIGAR_ORIGINS = {
   cuban: {
     key: "Cuban", label: "Cuban Cigars",
@@ -1443,10 +1447,12 @@ function renderStore(){
       <h3 class="section-label" style="margin-top:18px">Choose how to pay</h3>
       <button class="primary-btn" id="pay-btn" data-act="stripepay">Pay ${money(grandTotal())} by Card</button>
       <p class="small-note" style="font-size:12px;color:var(--muted)">You'll enter shipping and card details on Stripe's secure payment page — nothing sensitive is handled by this app directly.</p>
+      ${SHOW_BANK_TRANSFER ? `
       <button class="primary-btn" style="margin-top:10px;background:transparent;border:1px solid var(--gold);color:var(--gold)" data-act="gostore" data-val="banktransfer">Pay by Bank Transfer</button>
       <p class="small-note" style="font-size:12px;color:var(--muted)">We'll contact you to arrange payment.</p>
+      ` : ""}
     </div>`;
-  } else if(STATE.storeScreen === "banktransfer"){
+  } else if(STATE.storeScreen === "banktransfer" && SHOW_BANK_TRANSFER){
     body = `<div class="panel">
       <button class="back-link" data-act="navback">← Back to checkout</button>
       <h2 class="panel-title">Pay by Bank Transfer</h2>
@@ -2216,6 +2222,7 @@ async function handleAction(e){
   }
 
   else if(act==="submitbanktransfer"){
+    if(!SHOW_BANK_TRANSFER) return;
     const items = cartItems();
     if(items.length===0) return flash("Your cart is empty.","err");
     const g = id => (document.getElementById(id)?document.getElementById(id).value:"").trim();
