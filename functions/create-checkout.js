@@ -77,8 +77,17 @@ exports.handler = async (event) => {
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
+      // Card only. Without this, Stripe shows whatever payment methods are
+      // enabled in the dashboard — bank transfer, BECS direct debit, Link and
+      // so on can switch themselves on. Naming card explicitly stops that.
+      // Apple Pay and Google Pay still work: they are card wallets, not
+      // separate payment methods.
+      payment_method_types: ["card"],
       line_items,
       shipping_address_collection: { allowed_countries: ["AU"] },
+      // Asks for a phone number on the Stripe checkout page. It flows through
+      // to the order record, the customer invoice and the owner notification.
+      phone_number_collection: { enabled: true },
       shipping_options: [
         {
           shipping_rate_data: {
