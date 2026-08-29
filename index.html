@@ -1729,6 +1729,12 @@ function resolveHomeLinkTarget(target){
     const p = STATE.products.find(pp=>pp.id===a);
     if(!p) return;
     STATE.category = p.category;
+    // Land on the product itself, not just the page it lives on. Without this
+    // the customer arrives at a grid of everything and has to hunt for the item
+    // they tapped. Same mechanism the Recommended row uses.
+    STATE.storeScreen = "shop";
+    STATE.searchQuery = "";
+    STATE.scrollToProduct = a;
     if(p.category === "Cigars"){
       const originEntry = Object.entries(STATE.cigarOrigins).find(([,o])=>o.key.toLowerCase()===(p.cigarOrigin||"").trim().toLowerCase());
       if(originEntry){
