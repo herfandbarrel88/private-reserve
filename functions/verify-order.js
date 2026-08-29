@@ -43,7 +43,7 @@ const BIZ = {
 
   // Public web address of the site. Logo images are loaded from here,
   // so this must be the real live URL with no trailing slash.
-  siteUrl: "https://cigar-brothers-private-reserve.netlify.app",
+  siteUrl: "https://the-private-reserve.netlify.app",
 };
 
 // Logo file must sit in the repo root so it resolves at this address.
